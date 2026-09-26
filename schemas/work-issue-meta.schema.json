@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Agents Company Work Issue metadata",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "kind",
+    "status",
+    "priority",
+    "managerJobId",
+    "workerMethod",
+    "execution"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "kind": {
+      "const": "work"
+    },
+    "status": {
+      "enum": [
+        "backlog",
+        "ready",
+        "running",
+        "in_progress",
+        "blocked",
+        "review",
+        "archived"
+      ]
+    },
+    "priority": {
+      "enum": [
+        "critical",
+        "high",
+        "medium",
+        "low"
+      ]
+    },
+    "managerJobId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "workerMethod": {
+      "type": "object",
+      "required": [
+        "id",
+        "version"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      }
+    },
+    "workerMethodVersion": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "dedupeKey": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "execution": {
+      "type": "object",
+      "required": [
+        "requiredTools",
+        "requiredCapabilities",
+        "validationStrategy",
+        "deliveryMode"
+      ]
+    },
+    "claim": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "executionReceipt": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "finishedAt": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  }
+}
