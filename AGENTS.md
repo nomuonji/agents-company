@@ -12,7 +12,8 @@ Every agent starts by reading:
 2. `company/OPERATING_MODEL.md`
 3. the relevant Manager Job in `company/managers/`
 4. the referenced Method manifest + pinned/active version
-5. canonical aggregate state files under `company/state/`
+5. Manager state files under `company/state/`
+6. repository Issues for Work Items / Incidents
 
 The scheduler owns **when to wake up**. It must not duplicate the manuals stored here.
 
@@ -20,16 +21,14 @@ If GitHub itself is unavailable, stop rather than improvising and report the boo
 
 ## 2. Canonical state
 
-The initial/simple storage model deliberately uses a few aggregate JSON files:
+- Work Item = GitHub Issue with `kind: work`
+- System Incident = GitHub Issue with `kind: incident`
+- Worker claim lock = `company/claims/issue-<number>.json`
+- Manager current state = `company/state/managers.json`
+- Manager Run history = `company/state/manager-runs.json`
+- Methods = `company/methods/`
 
-- `company/state/work-items.json`
-- `company/state/incidents.json`
-- `company/state/managers.json`
-- `company/state/manager-runs.json`
-
-The Panel, Manager, and Worker all read the same files.
-
-Do not create a second queue in Issues, GitHub Projects, chat memory, scheduler prompts, or a local database.
+Do not create a second Work queue in JSON, Projects, chat memory, or scheduler prompts.
 
 ## 3. Roles
 
@@ -45,25 +44,25 @@ Do not create a second queue in Issues, GitHub Projects, chat memory, scheduler 
 
 - Selects only executable Work Items.
 - Reads Worker Method + Work Item execution contract before claim.
-- Claims one Work Item by optimistic current-SHA update of `work-items.json`.
+- Claims one Work Issue by creating its unique Issue lock file.
 - Executes, validates, records an execution receipt, then closes or reports a problem.
 - Does not normally create System Incidents directly.
 
-## 4. Aggregate JSON concurrency
+## 4. Issue metadata
 
-A write to an aggregate state file is an optimistic compare-and-swap:
+Issue body contains a hidden machine-readable block:
 
-1. Fetch the current file and retain its blob SHA.
-2. Parse the latest JSON.
-3. Modify only the intended entity/entities.
-4. Update the same file using the fetched SHA.
-5. If GitHub rejects the stale SHA, refetch the latest file.
-6. Re-evaluate the operation against the new state.
-7. Reapply only your intended change and retry.
+```text
+<!-- agents-company:meta
+{ ...valid JSON... }
+-->
+```
 
-Never force-overwrite a newer state file.
+Work template: `company/templates/work-issue.md`
 
-This simple model intentionally favors portability over maximum write parallelism. If real contention later becomes material, a future Method/Operating Model revision may shard state by Manager or Work Item.
+Incident template: `company/templates/incident-issue.md`
+
+Human-readable Markdown remains outside the metadata block.
 
 ## 5. Manager lease and run protocol
 
@@ -96,53 +95,35 @@ Never use `review` as a generic failure/handoff bucket.
 
 ## 7. Worker claim protocol
 
-1. Fetch `company/state/work-items.json` + SHA.
-2. Select an executable Work Item: prefer resumable `in_progress`, then highest-priority `ready`.
-3. Confirm no live claim belongs to another Agent.
-4. Resolve active Worker Method version unless already pinned.
-5. Merge Method runtime requirements with Work Item-specific requirements.
-6. Compare with tools/capabilities actually available in this invocation.
-7. Missing requirement → do not claim; update the item to `blocked` with a structured escalation to Manager.
-8. Otherwise set:
-   - status = `running`
-   - `workerMethodVersion`
-   - `claim.agentId`
-   - `claim.runnerId`
-   - `claim.claimedAt`
-   - `claim.leaseExpiresAt`
-   - runtime availability
-9. Update `work-items.json` with the fetched SHA.
-10. On conflict, refetch and reconsider.
+For Issue #N, the lock path is:
 
-Long work should heartbeat by extending its lease through the same optimistic update process.
+```text
+company/claims/issue-N.json
+```
+
+1. Read the open Work Issue and resolve its Worker Method.
+2. Verify runtime requirements.
+3. If a live lock file exists, skip this Issue.
+4. If an expired lock exists, remove it using its current SHA.
+5. Attempt to create the Issue-specific lock path.
+6. Create succeeds → claim won.
+7. Create reports the path already exists → claim lost; choose another Issue.
+8. Winner pins the Worker Method version and updates Issue metadata to `running`.
+9. Heartbeat by updating the lock lease with its current SHA.
+
+The unique file path is the atomic ownership primitive.
 
 ## 8. Worker problem report
 
-A blocked Work Item records:
+On a problem, update Work Issue metadata to `blocked` or `in_progress` and add a structured Issue comment with category, symptom, attempts, evidence, required capability, and next possible step.
 
-```json
-{
-  "status": "blocked",
-  "escalation": {
-    "status": "reported",
-    "reportedTo": "manager",
-    "category": "capability | safety | external_dependency | state | validation | tool_error | unknown",
-    "symptom": "...",
-    "attempted": [],
-    "evidence": [],
-    "requiredCapability": null,
-    "nextPossibleStep": null
-  }
-}
-```
-
-Use `in_progress` only when a known compatible route exists.
+Use `in_progress` only when a known compatible route exists. Release the lock after the Issue transition is recorded.
 
 ## 9. Manager triage and System Incidents
 
 Manager first tries to repair the Work Item: scope, validation, priority, route, or bundle.
 
-Create/update an entry in `incidents.json` only when:
+Create or update an Incident Issue only when:
 
 - the same class of failure recurs,
 - one Work Item repair would not prevent recurrence,
@@ -160,15 +141,11 @@ Agents report only tools actually available in the current invocation. Do not in
 
 ## 11. Issues / PRs
 
-Aggregate JSON state remains canonical.
-
-Use Issues only when native human notification/discussion helps, such as credentials, permissions, policy, or a human-only decision.
+Work Items and Incidents are already Issues, so their comments are the normal human/Agent discussion surface.
 
 Use PRs when the deliverable itself should be reviewed before entering the default branch.
 
-Store Issue/PR references back on the canonical Work Item or Incident.
-
-Routine queue state transitions are direct optimistic updates to aggregate state JSON, not PRs.
+Store PR references in the Work Issue execution receipt.
 
 ## 12. Completion
 
