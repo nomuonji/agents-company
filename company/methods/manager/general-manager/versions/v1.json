@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "methodId": "general-manager",
+  "version": "v1",
+  "role": "manager",
+  "runtimeRequirements": {
+    "requiredTools": [
+      "github"
+    ],
+    "requiredCapabilities": [
+      "repo_read",
+      "repo_write"
+    ],
+    "optionalTools": [
+      "web"
+    ],
+    "optionalCapabilities": [
+      "public_web_research"
+    ]
+  },
+  "stages": [
+    "preflight",
+    "observe",
+    "reconcile",
+    "decide",
+    "delegate",
+    "report"
+  ],
+  "qualityGates": [
+    "Triage existing escalations before generating more work",
+    "Do not create ready work that the intended Worker cannot execute",
+    "Prefer execution bundles over micro-tasks",
+    "Do not perform Worker implementation inside a Manager Run",
+    "Zero new Work Items is a valid outcome"
+  ]
+}
