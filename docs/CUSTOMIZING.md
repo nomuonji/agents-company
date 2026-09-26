@@ -4,95 +4,69 @@
 
 Edit `company/company.json`.
 
-Also update `github.repositoryFullName` after copying/forking the template if needed.
-
 ## 2. Manager Jobs
 
-Create one Manager Job per independently owned mission and add its ID to `company/company.json > managerJobIds`.
+Create one Manager Job per independently owned mission and add its ID to `managerJobIds`.
 
-Initialize its Manager state inside `company/state/managers.json`.
-
-Examples:
-
-- research-manager
-- product-manager
-- content-manager
-- site-operations-manager
+Initialize its lease/state in `company/state/managers.json`.
 
 ## 3. Methods
 
-Methods are reusable/versioned manuals.
+Methods are reusable, immutable, versioned manuals.
+
+Examples:
 
 ### Research company
-
-Manager runtime:
-- GitHub
-- web/search
-
-Worker delivery:
-- Markdown/data artifacts
-- citations/evidence
+- Manager: GitHub + web/search
+- Worker: research + evidence + Markdown/artifacts
 
 ### Software company
-
-Worker delivery may use:
-- direct commits for low-risk changes,
-- PRs for reviewable code/config changes.
+- Manager: GitHub + optional tracker
+- Worker: implementation + tests + PR/direct commit
 
 ### Content / SEO company
-
-Work Issues can specify:
-- web research,
-- analytics/search data,
-- production/live validation.
+- Manager: GitHub + web + analytics/search evidence
+- Worker: content/code change + production validation
 
 ### Personal knowledge company
+- GitHub-only may be enough
+- Work Issues can request notes, structured data, indexes, or decisions
 
-Work Issues can represent research, note synthesis, indexing, or structured datasets.
+## 4. Work Item schema
 
-## 4. Work Items
+Managers create GitHub Issues from `company/templates/work-issue.md`.
 
-Create a GitHub Issue using `company/templates/work-issue.md` or the repository Issue template.
+Task-specific runtime requirements and validation strategy live in the hidden Issue metadata.
 
-The machine-readable metadata block selects Manager Job, Worker Method, priority, execution requirements, and status.
+## 5. Multiple Workers
 
-## 5. Incidents
+A generic Worker searches open Work Issues, resolves candidate Worker Methods, checks runtime, and attempts the Issue-specific claim file.
 
-Create an Incident Issue only for structural/recurrent/cross-task failures.
+Workers racing for the same Issue cannot both create the same claim path.
 
-Use `company/templates/incident-issue.md`.
+## 6. External scheduler
 
-## 6. Multiple Workers
-
-Workers inspect repository Issues, resolve candidate Worker Methods, and claim only compatible Work Issues.
-
-Atomic ownership uses the Issue-specific lock file under `company/claims/`, so two Workers do not execute the same Issue concurrently.
-
-## 7. External scheduler
-
-Keep scheduler prompts thin.
-
-A trigger identifies:
+Keep scheduler prompts thin:
 
 - repository,
 - Manager Job or Worker role.
 
-Everything else belongs in `AGENTS.md`, Operating Model, Methods, and Issues.
+Everything else belongs in `AGENTS.md`, the Operating Model, Methods, and Work Issues.
 
-## 8. Adding a tool
+## 7. Adding a tool
 
-1. Add the tool/capability to the relevant Method or Work Issue metadata.
-2. Let the runtime report actual availability.
-3. Missing requirements prevent claim and escalate through Worker → Manager.
+1. Add it to the Method or Work Issue runtime requirements.
+2. Let the Agent report actual availability.
+3. Missing requirements block before claim and escalate Worker → Manager.
 
-## 9. Evolving the company
+## 8. Evolving the company
 
 For important operating changes:
 
-1. create/fix the Incident Issue if one exists,
+1. create/fix the Incident Issue when applicable,
 2. add a new immutable Method version,
-3. switch the manifest `activeVersion`,
+3. switch manifest `activeVersion`,
 4. update Operating Model if the invariant changed,
 5. record why in Decision Log.
 
-Do not rewrite historical Method versions after they have been used.
+Do not rewrite old Method version files that historical executions may reference.
