@@ -1,19 +1,17 @@
 name: Human action
 description: Human-only decision, credential, permission, or policy request.
 title: "[Human] "
-labels: ["human-action"]
+labels: []
 body:
   - type: markdown
     attributes:
       value: |
-        This Issue is an auxiliary interaction surface. Canonical state remains under company/state.
+        Link this Issue to the canonical Work/Incident Issue when applicable.
   - type: input
     id: canonical
     attributes:
-      label: Canonical state file
-      placeholder: company/state/work-items/wi-123.json
-    validations:
-      required: true
+      label: Related Work / Incident Issue
+      placeholder: "#123"
   - type: textarea
     id: action
     attributes:
