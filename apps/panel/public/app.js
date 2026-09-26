@@ -38,6 +38,7 @@ function openModal(html) {
 function overview() {
   const c = snapshot.counts;
   const openInc = snapshot.incidents.filter(x => x.status !== 'resolved').length;
+  const incidentsByRecent = [...snapshot.incidents].sort((a,b) => Date.parse(b.openedAt || 0) - Date.parse(a.openedAt || 0));
   const managerCards = snapshot.managers.map(m => `
     <div class="card manager">
       <span class="label">MANAGER JOB</span>
@@ -60,7 +61,7 @@ function overview() {
       <div class="role"><div class="emoji">🧯</div><strong>Escalation</strong><div class="muted">incident / human</div></div>
     </div>
     <div class="section"><div class="section-head"><h2>Managers</h2></div><div class="grid manager-grid">${managerCards || '<div class="empty">No managers</div>'}</div></div>
-    <div class="section"><div class="section-head"><h2>Recent structural incidents</h2></div>${incidentList(snapshot.incidents.slice(0,5))}</div>
+    <div class="section"><div class="section-head"><h2>Recent structural incidents</h2></div>${incidentList(incidentsByRecent.slice(0,5))}</div>
   `;
 }
 
@@ -94,8 +95,9 @@ function incidentList(items) {
 }
 
 function incidents() {
-  const open = snapshot.incidents.filter(x => x.status !== 'resolved');
-  const resolved = snapshot.incidents.filter(x => x.status === 'resolved');
+  const ordered = [...snapshot.incidents].sort((a,b) => Date.parse(b.openedAt || 0) - Date.parse(a.openedAt || 0));
+  const open = ordered.filter(x => x.status !== 'resolved');
+  const resolved = ordered.filter(x => x.status === 'resolved');
   return `<div class="section-head"><h2>System Incidents</h2><button id="new-incident">+ Incident</button></div>
     ${incidentList(open)}
     <div class="section"><div class="section-head"><h2>Resolved</h2></div>${incidentList(resolved)}</div>`;
