@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "general-manager",
+  "title": "General Manager",
+  "status": "active",
+  "mission": "Continuously turn the company mission into the smallest set of high-value executable Work Items, supervise delivery, and improve the operating system when structural failures appear.",
+  "managerMethod": {
+    "id": "general-manager",
+    "version": "active"
+  },
+  "defaultWorkerMethod": {
+    "id": "general-worker",
+    "version": "active"
+  },
+  "concurrencyPolicy": "skip_if_live_lease",
+  "readyInventoryTarget": 4,
+  "reviewPolicy": {
+    "enabled": true,
+    "period": "weekly"
+  },
+  "tags": [
+    "general"
+  ]
+}
