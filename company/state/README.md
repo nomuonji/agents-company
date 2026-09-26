@@ -1,33 +1,28 @@
 # Operational state
 
-This directory is the machine-readable live state of the company.
+Work Items and System Incidents are GitHub Issues.
 
-The initial/simple model uses a small set of **known aggregate JSON files**:
+Only state that does not naturally map to one Issue remains as repository JSON:
 
-- `work-items.json` — all Work Items
-- `incidents.json` — all System Incidents
-- `managers.json` — Manager leases + current Manager state
+- `managers.json` — Manager leases and current Manager state
 - `manager-runs.json` — Manager Run history
 
-Each file has a top-level `revision` for human/debug visibility, but GitHub's blob SHA is the actual optimistic concurrency token.
+Worker claim mutexes are temporary files under:
 
-## Write rule
+```text
+company/claims/issue-<number>.json
+```
 
-1. Fetch the latest file and retain its SHA.
-2. Modify only the intended entity.
-3. Increment `revision`.
-4. Update the file with that SHA.
-5. On stale-SHA conflict, refetch and reapply only the intended change.
+The Issue remains canonical. A claim file is only a technical lock.
 
-Never overwrite a newer aggregate file wholesale from stale local/chat state.
+## Manager-state writes
 
-## Why aggregate JSON first?
+For `managers.json` and `manager-runs.json`:
 
-It keeps:
+1. fetch current file + blob SHA,
+2. modify only the intended Manager/Run state,
+3. increment `revision`,
+4. update with the fetched SHA,
+5. stale SHA → refetch and reapply only the intended mutation.
 
-- GitHub MCP access simple,
-- GitHub Pages Panel fully static,
-- file discovery unnecessary,
-- the template easy to understand.
-
-If measured Agent concurrency later makes retries noisy, state can be sharded by Manager or Work Item as a future optimization.
+Never overwrite newer state from stale chat/local memory.
