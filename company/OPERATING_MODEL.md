@@ -33,23 +33,18 @@ GitHub remote is the canonical control plane. Git history provides auditability.
 
 The scheduler is never the manual. The Panel is never the database.
 
-## 3. Canonical state files
+## 3. Canonical operational state
 
-The initial/simple storage model uses four known aggregate files:
+Work Items and System Incidents are GitHub Issues.
 
-```text
-company/state/
-  work-items.json
-  incidents.json
-  managers.json
-  manager-runs.json
-```
+A Work Item Issue contains a hidden `agents-company:meta` JSON block with `kind: work`. An Incident Issue uses `kind: incident`.
 
-This intentionally optimizes for simplicity, GitHub Pages compatibility, and easy GitHub-MCP operation.
+Manager lease state and Manager Run history remain in:
 
-Concurrent writes use GitHub blob SHA as optimistic compare-and-swap. Conflicting Agents refetch and reapply only their intended entity change.
+- `company/state/managers.json`
+- `company/state/manager-runs.json`
 
-If contention later becomes operationally significant, state can be sharded without changing the Manager/Worker model.
+Worker claim ownership is represented by short-lived lock files under `company/claims/`.
 
 ## 4. Work Item semantics
 
@@ -98,13 +93,13 @@ Default to meaningful execution bundles rather than micro-tasks.
 
 ## 8. Worker escalation
 
-Worker problems go to Manager first. Worker records facts on the Work Item and releases the claim into `in_progress` or `blocked`.
+Worker problems go to Manager first. Worker updates the Work Issue to `in_progress` or `blocked`, adds a structured escalation comment, and releases the Issue claim lock.
 
 Manager triages before generating more inventory.
 
 ## 9. System Incidents
 
-Incidents live in `incidents.json`.
+System Incidents are GitHub Issues with `kind: incident`.
 
 Create one for structural / recurring / cross-task failures, not every failed action.
 
@@ -119,7 +114,7 @@ Resolution requires:
 
 ## 10. Human escalation
 
-Use a GitHub Issue only when a human-native interaction surface helps. Canonical Work Item/Incident state remains in aggregate JSON and stores the Issue reference.
+Human decisions can happen directly in the Work/Incident Issue discussion, or in a separate human-action Issue when clearer.
 
 ## 11. Pull requests
 
@@ -127,11 +122,9 @@ Use a PR when the deliverable needs review before merging. Routine operational s
 
 ## 12. Read-only GitHub Pages Panel
 
-The Panel is a static site that directly fetches known repository JSON/Markdown files.
+For public repositories, the Panel reads Work/Incident Issues from GitHub's public API and repository files from Pages.
 
-It has no write API, local state server, remote database, or Actions-generated snapshot requirement.
-
-Agents modify canonical GitHub state. Humans observe it through the Panel.
+The Panel has no write API and no local state server. Private-repository display needs an authenticated server-side snapshot or backend.
 
 ## 13. Repair workflow
 
