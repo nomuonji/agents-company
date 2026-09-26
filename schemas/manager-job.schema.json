@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Agents Company Manager Job",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "id",
+    "title",
+    "status",
+    "mission",
+    "managerMethod",
+    "defaultWorkerMethod"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "id": {
+      "type": "string"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": [
+        "active",
+        "paused",
+        "archived"
+      ]
+    },
+    "mission": {
+      "type": "string",
+      "minLength": 1
+    },
+    "managerMethod": {
+      "type": "object",
+      "required": [
+        "id",
+        "version"
+      ]
+    },
+    "defaultWorkerMethod": {
+      "type": "object",
+      "required": [
+        "id",
+        "version"
+      ]
+    },
+    "concurrencyPolicy": {
+      "enum": [
+        "skip_if_live_lease",
+        "allow_overlap"
+      ]
+    },
+    "readyInventoryTarget": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "reviewPolicy": {
+      "type": "object"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}
