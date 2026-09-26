@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "id": "general-worker",
+  "role": "worker",
+  "title": "General Worker Method",
+  "activeVersion": "v1",
+  "versions": [
+    "v1"
+  ]
+}
