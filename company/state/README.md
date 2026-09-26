@@ -2,11 +2,32 @@
 
 This directory is the machine-readable live state of the company.
 
-- `manager-leases/` — one pre-created lease file per Manager Job; current-SHA update provides atomic Manager claim
-- `manager-runs/` — immutable-ish history of each management cycle
-- `work-items/` — executable queue; one file per Work Item
-- `incidents/` — structural failure records
+The initial/simple model uses a small set of **known aggregate JSON files**:
 
-Do not create a single combined queue file. Entity-per-file storage is intentional for concurrent GitHub-MCP actors.
+- `work-items.json` — all Work Items
+- `incidents.json` — all System Incidents
+- `managers.json` — Manager leases + current Manager state
+- `manager-runs.json` — Manager Run history
 
-Operational state transitions normally commit directly to the default branch. Deliverables may use PRs separately.
+Each file has a top-level `revision` for human/debug visibility, but GitHub's blob SHA is the actual optimistic concurrency token.
+
+## Write rule
+
+1. Fetch the latest file and retain its SHA.
+2. Modify only the intended entity.
+3. Increment `revision`.
+4. Update the file with that SHA.
+5. On stale-SHA conflict, refetch and reapply only the intended change.
+
+Never overwrite a newer aggregate file wholesale from stale local/chat state.
+
+## Why aggregate JSON first?
+
+It keeps:
+
+- GitHub MCP access simple,
+- GitHub Pages Panel fully static,
+- file discovery unnecessary,
+- the template easy to understand.
+
+If measured Agent concurrency later makes retries noisy, state can be sharded by Manager or Work Item as a future optimization.
