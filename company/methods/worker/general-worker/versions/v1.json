@@ -23,9 +23,10 @@
     "finish_or_report"
   ],
   "qualityGates": [
-    "Read Work Item and Worker Method before claim",
+    "Read aggregate work-items.json and Worker Method before claim",
     "Pin Worker Method version on first successful claim",
     "Never claim with missing runtime requirements",
+    "Use current-SHA optimistic update and re-evaluate after conflicts",
     "Never send unfinished work to review",
     "Record execution receipt on completion",
     "Report execution problems to Manager first"
