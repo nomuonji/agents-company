@@ -1,0 +1,162 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/nomuonji/agents-company/schemas/work-item.schema.json",
+  "title": "Agents Company Work Item",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "id",
+    "title",
+    "objective",
+    "status",
+    "priority",
+    "managerJobId",
+    "workerMethod",
+    "acceptanceCriteria",
+    "execution",
+    "createdAt",
+    "updatedAt"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^wi-"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "objective": {
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "backlog",
+        "ready",
+        "in_progress",
+        "running",
+        "blocked",
+        "review",
+        "archived"
+      ]
+    },
+    "priority": {
+      "enum": [
+        "critical",
+        "high",
+        "medium",
+        "low"
+      ]
+    },
+    "managerJobId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "workerMethod": {
+      "type": "object",
+      "required": [
+        "id",
+        "version"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      }
+    },
+    "workerMethodVersion": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "dedupeKey": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "acceptanceCriteria": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "execution": {
+      "type": "object",
+      "required": [
+        "requiredTools",
+        "requiredCapabilities",
+        "validationStrategy",
+        "deliveryMode"
+      ],
+      "properties": {
+        "requiredTools": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "requiredCapabilities": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "validationStrategy": {
+          "type": "object"
+        },
+        "deliveryMode": {
+          "enum": [
+            "direct_commit",
+            "pull_request",
+            "issue",
+            "artifact"
+          ]
+        }
+      }
+    },
+    "claim": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "escalation": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "executionReceipt": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "resultSummary": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "createdAt": {
+      "type": "string"
+    },
+    "updatedAt": {
+      "type": "string"
+    },
+    "finishedAt": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  }
+}
