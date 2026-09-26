@@ -2,7 +2,7 @@
 
 ## 1. Purpose
 
-This repository is a portable agent company. It must work without a remote database or project-specific agent platform.
+This repository is a portable Agent company that can run without a remote database or always-on orchestration server.
 
 ```text
 Human
@@ -17,7 +17,7 @@ Manager
   ↓ outcomes / escalation / incidents / improvement
 ```
 
-Git history provides auditability. Entity-per-file state minimizes write contention. GitHub MCP provides the default remote execution interface. The local Panel provides the human control surface.
+GitHub remote is the canonical control plane. Git history provides auditability. GitHub MCP is the default remote execution interface. GitHub Pages provides a read-only human Panel.
 
 ## 2. Separation of responsibility
 
@@ -25,14 +25,33 @@ Git history provides auditability. Entity-per-file state minimizes write content
 - **Manager Job**: WHAT outcome is owned.
 - **Manager Method**: HOW management is performed.
 - **Work Item**: WHAT concrete work is requested.
-- **Worker Method**: HOW work is executed, validated, and reported.
+- **Worker Method**: HOW work is executed, validated, delivered, and reported.
 - **Execution Receipt**: WHAT actually happened.
 - **Incident**: WHAT was structurally wrong and how recurrence is prevented.
 - **Decision Log**: WHY important operating design changed.
+- **Panel**: read-only projection of canonical GitHub state.
 
-The scheduler is never the manual.
+The scheduler is never the manual. The Panel is never the database.
 
-## 3. State semantics
+## 3. Canonical state files
+
+The initial/simple storage model uses four known aggregate files:
+
+```text
+company/state/
+  work-items.json
+  incidents.json
+  managers.json
+  manager-runs.json
+```
+
+This intentionally optimizes for simplicity, GitHub Pages compatibility, and easy GitHub-MCP operation.
+
+Concurrent writes use GitHub blob SHA as optimistic compare-and-swap. Conflicting Agents refetch and reapply only their intended entity change.
+
+If contention later becomes operationally significant, state can be sharded without changing the Manager/Worker model.
+
+## 4. Work Item semantics
 
 | State | Meaning |
 | --- | --- |
@@ -41,7 +60,7 @@ The scheduler is never the manual.
 | running | Actively claimed with an unexpired lease. |
 | in_progress | Unfinished, idle, known compatible route exists. |
 | blocked | Unfinished and currently not executable. |
-| review | Implementation and validation are complete; judgment remains. |
+| review | Implementation and validation complete; judgment remains. |
 | archived | Terminal history. |
 
 ### Invariants
@@ -51,68 +70,46 @@ The scheduler is never the manual.
 - A live claim belongs to its claimant.
 - Same failure + same runtime must not be blindly retried.
 - Normal successful work can go directly to `archived`.
-- Manager work and Worker work are separate.
+- Manager work and Worker implementation are separate.
 - Incidents are not ordinary Worker queue inventory.
 
-## 4. Methods and version pinning
+## 5. Methods and version pinning
 
 Methods are immutable by version.
 
-```text
-company/methods/
-  manager/<method>/
-    manifest.json
-    versions/v1.json
-    versions/v1.md
-  worker/<method>/
-    manifest.json
-    versions/v1.json
-    versions/v1.md
-```
-
-- Manager Run pins the Manager Method version at run start.
+- Manager Run pins the active Manager Method version at run start.
 - Work Item references a Worker Method.
 - Worker Method version is pinned on first successful claim.
-- Future Method improvements do not rewrite historical execution context.
+- Method improvements do not rewrite historical execution context.
 
-## 5. Runtime requirements
+## 6. Runtime requirements
 
-Method version JSON declares:
+Method version JSON declares required/optional tools and capabilities. Work Item `execution` may add requirements.
 
-```json
-{
-  "runtimeRequirements": {
-    "requiredTools": ["github"],
-    "requiredCapabilities": ["repo_read", "repo_write"],
-    "optionalTools": [],
-    "optionalCapabilities": []
-  }
-}
-```
+The runner reports only actual availability. Missing requirements prevent claim.
 
-Work Item `execution` may add requirements. Required sets are merged.
+## 7. Work Bundle granularity
 
-The runner reports only actual availability. A missing requirement prevents claim.
+Bundle when repository/context/validation/release/safety boundaries align.
 
-## 6. Work Bundle granularity
+Split when safety, approval, locks, risk, or validation windows differ.
 
-Default unit is a meaningful execution bundle, not a micro-task.
+Default to meaningful execution bundles rather than micro-tasks.
 
-Bundle when repository/context/validation/release/safety boundaries align. Split when safety, approval, locks, risk, or validation windows differ.
+## 8. Worker escalation
 
-## 7. Worker escalation
-
-Worker problems go to the Manager first. Worker records facts on the Work Item and releases the claim into `in_progress` or `blocked`.
+Worker problems go to Manager first. Worker records facts on the Work Item and releases the claim into `in_progress` or `blocked`.
 
 Manager triages before generating more inventory.
 
-## 8. System Incidents
+## 9. System Incidents
 
-Incidents are separate files because file-backed storage makes entity separation cheap and reduces queue pollution.
+Incidents live in `incidents.json`.
 
-Create one for structural/recurring/cross-task problems, not every failed action.
+Create one for structural / recurring / cross-task failures, not every failed action.
 
 Resolution requires:
+
 1. Detect
 2. Diagnose
 3. Repair
@@ -120,26 +117,28 @@ Resolution requires:
 5. Prevention
 6. Update Operating Model / Method / Decision Log when necessary
 
-## 9. Human escalation
+## 10. Human escalation
 
-Use a GitHub Issue only when a human-native interaction surface is beneficial. The Incident or Work Item file remains canonical and stores `githubIssue`.
+Use a GitHub Issue only when a human-native interaction surface helps. Canonical Work Item/Incident state remains in aggregate JSON and stores the Issue reference.
 
-## 10. Pull requests
+## 11. Pull requests
 
 Use a PR when the deliverable needs review before merging. Routine operational state transitions do not need PRs.
 
-## 11. Local Panel
+## 12. Read-only GitHub Pages Panel
 
-The Panel reads the same files as agents. It is not another database.
+The Panel is a static site that directly fetches known repository JSON/Markdown files.
 
-It may write local state files for human actions; those changes become durable only when committed/pushed.
+It has no write API, local state server, remote database, or Actions-generated snapshot requirement.
 
-## 12. Repair workflow
+Agents modify canonical GitHub state. Humans observe it through the Panel.
 
-When the human says "the company seems wrong":
+## 13. Repair workflow
+
+When the Human says "the company seems wrong":
 
 1. Read this Operating Model.
-2. Inspect current Work Items, Manager Runs, and Incidents.
+2. Inspect Work Items, Manager state/Runs, and Incidents.
 3. Compare expected vs actual behavior.
 4. Repair the narrowest correct layer.
 5. Record structural failures as Incidents.
