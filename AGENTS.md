@@ -47,6 +47,26 @@ Each entity is a separate file to reduce write contention.
 
 Do not create a second queue in Issues, Projects, chat memory, or scheduler prompts.
 
+## 4. Manager lease and run protocol
+
+For a Manager Job:
+
+1. Fetch `company/state/manager-leases/<managerJobId>.json` and keep its blob SHA.
+2. If `leaseExpiresAt` is still in the future for another actor, do not start another Manager cycle when the Job uses `skip_if_live_lease`.
+3. Resolve the Manager Method active version and compare its runtime requirements with tools/capabilities actually available now.
+4. Create a unique Manager Run ID.
+5. Claim the lease with a current-SHA update:
+   - `claimedBy`
+   - `runnerId`
+   - `claimedAt`
+   - `leaseExpiresAt`
+   - `managerRunId`
+6. Create `company/state/manager-runs/<runId>.json` and pin the exact Manager Method version.
+7. Run Observe → Reconcile → Decide → Delegate.
+8. Finish the Manager Run, then release the lease with another current-SHA update.
+
+If the lease SHA update conflicts, refetch and reconsider. Never force-overwrite another Manager.
+
 ## 4. Work Item states
 
 - `backlog`: deliberately deferred
