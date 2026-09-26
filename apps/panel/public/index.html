@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Agents Company</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div id="app">
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-mark">AC</span><div><strong>Agents Company</strong><small>repo-native control plane</small></div></div>
+      <nav id="nav">
+        <button data-view="overview" class="active">Overview</button>
+        <button data-view="work">Work Board</button>
+        <button data-view="incidents">Incidents</button>
+        <button data-view="methods">Methods</button>
+        <button data-view="governance">Governance</button>
+      </nav>
+      <div class="sidebar-foot">
+        <span id="git-dot" class="dot"></span><span id="git-state">Git status</span>
+      </div>
+    </aside>
+    <main>
+      <header class="topbar">
+        <div><p class="eyebrow">LOCAL CONTROL PANEL</p><h1 id="company-name">Agents Company</h1><p id="mission" class="muted"></p></div>
+        <div class="actions"><button id="refresh" class="secondary">Refresh</button><button id="new-work">+ Work Item</button></div>
+      </header>
+      <section id="content"></section>
+    </main>
+  </div>
+
+  <dialog id="modal"><form method="dialog" class="modal-card"><button class="close" value="cancel">×</button><div id="modal-content"></div></form></dialog>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
