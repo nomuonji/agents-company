@@ -1,61 +1,82 @@
 # Architecture
 
-## GitHub remote is the system of record
+## GitHub-native company
 
-The least-capable Agent is assumed to have GitHub read/write access through MCP.
+The least-capable remote Agent is assumed to have authenticated GitHub read/write access through MCP.
 
-All critical operations reduce to:
+The core primitives are:
 
-- fetch a known repository file,
-- inspect its content + blob SHA,
-- optimistically update that same file,
-- optionally create an Issue or PR.
+- GitHub Issues for Work Items and System Incidents,
+- repository files for Methods, governance, Manager state, and short-lived claim locks,
+- pull requests for reviewable deliverables,
+- GitHub Pages for read-only human visibility.
 
-No remote database, queue service, webhook server, local control-plane server, or always-on daemon is required.
+No remote database or always-on orchestration server is required.
 
-## Aggregate state
+## Work Items and Incidents
 
-The simple default uses four known JSON files:
+Issue body contains a hidden machine-readable metadata block:
 
-- `company/state/work-items.json`
-- `company/state/incidents.json`
+```text
+<!-- agents-company:meta
+{ ...JSON... }
+-->
+```
+
+Human-readable instructions/discussion stay in normal Markdown/comments.
+
+Work templates live under `company/templates/`.
+
+## Atomic Worker claim
+
+Issue #123 is protected by:
+
+```text
+company/claims/issue-123.json
+```
+
+A Worker attempts to create that path.
+
+- first create succeeds → ownership acquired,
+- later create sees existing path → claim lost,
+- heartbeat updates the lock by current SHA,
+- expired lock may be removed by current SHA and recreated,
+- completion/problem transition updates the Issue first, then removes the lock.
+
+This is intentionally separate from Issue assignee/labels.
+
+## Manager state
+
+Manager lease and Run history remain in:
+
 - `company/state/managers.json`
 - `company/state/manager-runs.json`
 
-This makes the Pages Panel trivial because no directory discovery is required.
-
-## Optimistic concurrency
-
-GitHub's blob SHA acts as compare-and-swap.
-
-For example, two Workers may both fetch `work-items.json` at SHA A. If Worker 1 writes first, SHA becomes B. Worker 2's write against A fails. Worker 2 refetches B, checks that its target item is still claimable, reapplies only that item change, and retries.
-
-The simple model may create more retries under heavy concurrency, but it cannot silently overwrite newer state when Agents follow the current-SHA protocol.
-
-## Why not one file per Work Item initially?
-
-One-file-per-entity scales concurrent writes better, but requires file discovery/indexing for a fully static Pages UI and creates more repository surface area.
-
-This template starts simple. Sharding is an optimization to introduce only when measured contention justifies it.
-
-## GitHub Issues
-
-Issues are auxiliary human interaction for credentials, permissions, policy, or discussion-heavy decisions. Canonical state remains in JSON.
+These use current-SHA optimistic writes.
 
 ## Pull requests
 
-PRs are delivery/review surfaces for deliverables that should not land directly. Store the PR reference in the Work Item execution receipt.
+PRs are delivery/review surfaces for changes that should not land directly. Store the PR reference in the Work Issue execution receipt.
 
-## GitHub Pages Panel
+## Public GitHub Pages Panel
 
-The root static Panel fetches the known state JSONs and governance Markdown directly from the same repository.
+The root Panel calls the public repository Issues API directly and filters Issues by `agents-company:meta`.
 
-No rendering build or snapshot generation is required.
+No generated snapshot is required for a public repository.
 
-Configure GitHub Pages to deploy from the `main` branch repository root.
+## Private repositories
+
+Authenticated GitHub APIs can read private Issues when the caller has repository Issues read permission.
+
+A static browser page must not embed a reusable repository credential. Therefore a private repository needs either:
+
+- an authenticated backend/proxy, or
+- a server-side build step that writes a read-only Issue snapshot for the Panel.
+
+See `docs/PRIVATE_REPOSITORY.md`.
 
 ## Scheduler
 
-Any external scheduler may invoke an Agent. The trigger identifies the repository + Manager Job or Worker role and tells the Agent to read `AGENTS.md`.
+External scheduler prompts identify the repository + Manager Job or Worker role and tell the Agent to read `AGENTS.md`.
 
 Detailed operating rules stay in the repository.
