@@ -37,3 +37,28 @@
 **Decision:** The dashboard is a local web app backed directly by repository files.
 
 **Why:** Human visibility should not require a remote DB or duplicate state service.
+
+
+---
+
+## 2026-09-27 — Aggregate state supersedes entity-per-file for the default template
+
+**Decision:** The default template now stores Work Items, Incidents, Manager state, and Manager Runs in four known aggregate JSON files.
+
+**Supersedes:** the earlier same-day decision to make every Work Item / Run / Lease / Incident a separate file.
+
+**Why:** The default template should optimize first for simplicity, GitHub-MCP ergonomics, and a completely static GitHub Pages Panel. A handful of known JSON files eliminates directory discovery/index generation and removes the local Panel server.
+
+**Concurrency trade-off:** unrelated Agent writes can conflict on the same aggregate file. GitHub blob SHA remains the safety primitive: stale updates fail, then the Agent refetches, re-evaluates, reapplies only its intended entity change, and retries.
+
+**Future threshold:** shard state only after measured contention becomes operationally meaningful.
+
+---
+
+## 2026-09-27 — Panel is GitHub Pages read-only
+
+**Decision:** The local read/write Panel is removed. The root static Panel fetches canonical repository JSON/Markdown directly and never writes state.
+
+**Why:** Agents already mutate GitHub remote through GitHub MCP. A write-capable local Panel created an unnecessary second mutation path and local/remote synchronization state.
+
+**Deployment:** GitHub Pages can publish the `main` branch repository root directly. No application server, render step, snapshot generation, or deployment Actions workflow is required.
