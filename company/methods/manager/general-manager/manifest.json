@@ -3,8 +3,9 @@
   "id": "general-manager",
   "role": "manager",
   "title": "General Manager Method",
-  "activeVersion": "v1",
+  "activeVersion": "v2",
   "versions": [
-    "v1"
+    "v1",
+    "v2"
   ]
 }
