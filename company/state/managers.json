@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "revision": 1,
+  "managers": {
+    "general-manager": {
+      "lease": {
+        "claimedBy": null,
+        "runnerId": null,
+        "claimedAt": null,
+        "leaseExpiresAt": null,
+        "managerRunId": null
+      },
+      "lastRun": null
+    }
+  }
+}
