@@ -1,0 +1,21 @@
+name: Validate Agents Company
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm test
+      - run: npm run validate
+      - run: node --check apps/panel/server.mjs
+      - run: node --check apps/panel/public/app.js
+      - run: node --check packages/cli/src/cli.mjs
