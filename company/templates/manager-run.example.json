@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "id": "mr-example",
+  "managerJobId": "general-manager",
+  "status": "archived",
+  "managerMethod": {
+    "id": "general-manager",
+    "version": "v1"
+  },
+  "runtimeAvailability": {
+    "tools": [
+      "github"
+    ],
+    "capabilities": [
+      "repo_read",
+      "repo_write"
+    ]
+  },
+  "claimedBy": "agent-example",
+  "startedAt": "2026-09-27T00:00:00.000Z",
+  "finishedAt": "2026-09-27T00:05:00.000Z",
+  "observations": [],
+  "decisions": [],
+  "createdWorkItemIds": [],
+  "reconciledWorkItemIds": [],
+  "resultSummary": "Example completed Manager Run."
+}
