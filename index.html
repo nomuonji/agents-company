@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="color-scheme" content="dark" />
+  <title>Agents Company</title>
+  <link rel="stylesheet" href="./panel.css" />
+</head>
+<body>
+  <div id="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="brand-mark">AC</span>
+        <div><strong>Agents Company</strong><small>GitHub-native control plane</small></div>
+      </div>
+      <nav id="nav">
+        <button data-view="overview" class="active">Overview</button>
+        <button data-view="work">Work Board</button>
+        <button data-view="incidents">Incidents</button>
+        <button data-view="methods">Methods</button>
+        <button data-view="governance">Governance</button>
+      </nav>
+      <div class="sidebar-foot">
+        <span class="dot"></span>
+        <span>read-only · GitHub remote</span>
+      </div>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">GITHUB REMOTE · READ ONLY</p>
+          <h1 id="company-name">Agents Company</h1>
+          <p id="mission" class="muted"></p>
+        </div>
+        <div class="actions">
+          <span id="updated" class="sync-hint"></span>
+          <button id="refresh" class="secondary">Refresh</button>
+        </div>
+      </header>
+      <section id="content"><div class="empty">Loading company state…</div></section>
+    </main>
+  </div>
+
+  <dialog id="modal">
+    <form method="dialog" class="modal-card">
+      <button class="close" value="cancel">×</button>
+      <div id="modal-content"></div>
+    </form>
+  </dialog>
+
+  <script type="module" src="./panel.js"></script>
+</body>
+</html>
