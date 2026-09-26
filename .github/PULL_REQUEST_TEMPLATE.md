@@ -1,6 +1,6 @@
 ## Canonical Work Item
 
-`company/state/work-items/<id>.json`
+GitHub Issue: #<number>
 
 ## Deliverable
 
@@ -8,6 +8,6 @@ Describe the concrete change.
 
 ## Validation
 
-- [ ] Acceptance criteria checked
-- [ ] Work Item validation strategy executed
-- [ ] PR URL/number will be written back to the Work Item execution receipt
+- [ ] Work Issue acceptance criteria checked
+- [ ] Work Issue validation strategy executed
+- [ ] PR URL/number will be written back to the Work Issue execution receipt
