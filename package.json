@@ -4,18 +4,13 @@
   "private": true,
   "type": "module",
   "workspaces": [
-    "apps/*",
     "packages/*"
   ],
   "engines": {
     "node": ">=22"
   },
   "scripts": {
-    "panel": "node apps/panel/server.mjs",
-    "validate": "node packages/core/src/validate.mjs",
     "test": "node --test packages/core/test/*.test.mjs",
-    "snapshot": "node packages/cli/src/cli.mjs snapshot",
-    "new:work": "node packages/cli/src/cli.mjs new-work",
-    "new:incident": "node packages/cli/src/cli.mjs incident"
+    "validate": "node packages/core/src/validate.mjs"
   }
 }
