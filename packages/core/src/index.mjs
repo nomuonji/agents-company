@@ -1,9 +1,7 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import { randomUUID } from 'node:crypto';
 
 export const WORK_STATES = ['backlog','ready','in_progress','running','blocked','review','archived'];
-export const PRIORITIES = ['critical','high','medium','low'];
 
 export async function findRepoRoot(start = process.cwd()) {
   let current = path.resolve(start);
@@ -24,36 +22,6 @@ export async function readJson(file) {
 
 export async function readText(file) {
   return fs.readFile(file, 'utf8');
-}
-
-export async function writeJsonAtomic(file, value) {
-  await fs.mkdir(path.dirname(file), { recursive: true });
-  const tmp = file + '.tmp-' + process.pid + '-' + Date.now();
-  await fs.writeFile(tmp, JSON.stringify(value, null, 2) + '\n', 'utf8');
-  await fs.rename(tmp, file);
-}
-
-export async function listJson(dir) {
-  let names = [];
-  try {
-    names = await fs.readdir(dir);
-  } catch (error) {
-    if (error.code === 'ENOENT') return [];
-    throw error;
-  }
-  const rows = [];
-  for (const name of names.filter((name) => name.endsWith('.json')).sort()) {
-    rows.push(await readJson(path.join(dir, name)));
-  }
-  return rows;
-}
-
-export function nowIso() {
-  return new Date().toISOString();
-}
-
-export function newId(prefix) {
-  return prefix + '-' + randomUUID().replaceAll('-', '').slice(0, 12);
 }
 
 export function leaseIsLive(claim, now = Date.now()) {
@@ -118,6 +86,7 @@ export function validateWorkItem(item) {
   if (item?.status === 'running') {
     if (!item.claim?.agentId) errors.push('running item missing claim.agentId');
     if (!item.claim?.leaseExpiresAt) errors.push('running item missing claim.leaseExpiresAt');
+    if (!item.workerMethodVersion) errors.push('running item missing pinned workerMethodVersion');
   }
   if (item?.status === 'review' && item.executionReceipt?.validationComplete !== true) {
     errors.push('review requires executionReceipt.validationComplete=true');
@@ -143,31 +112,43 @@ export function validateIncident(incident) {
 export async function loadSnapshot(rootInput) {
   const root = rootInput || await findRepoRoot();
   const company = await readJson(path.join(root, 'company', 'company.json'));
-  const managers = await listJson(path.join(root, 'company', 'managers'));
-  const workItems = await listJson(path.join(root, 'company', 'state', 'work-items'));
-  const incidents = await listJson(path.join(root, 'company', 'state', 'incidents'));
-  const managerRuns = await listJson(path.join(root, 'company', 'state', 'manager-runs'));
-  const managerLeases = await listJson(path.join(root, 'company', 'state', 'manager-leases'));
+  const workState = await readJson(path.join(root, 'company', 'state', 'work-items.json'));
+  const incidentState = await readJson(path.join(root, 'company', 'state', 'incidents.json'));
+  const managersState = await readJson(path.join(root, 'company', 'state', 'managers.json'));
+  const managerRunsState = await readJson(path.join(root, 'company', 'state', 'manager-runs.json'));
 
-  const methodSummaries = [];
-  for (const role of ['manager','worker']) {
-    const roleDir = path.join(root, 'company', 'methods', role);
-    let methodIds = [];
-    try { methodIds = await fs.readdir(roleDir); } catch {}
-    for (const id of methodIds.sort()) {
-      try {
-        const method = await resolveMethod(root, role, { id, version:'active' });
-        methodSummaries.push({
-          role,
-          id,
-          title: method.manifest.title,
-          activeVersion: method.version,
-          runtimeRequirements: method.spec.runtimeRequirements,
-          qualityGates: method.spec.qualityGates || [],
-        });
-      } catch {}
+  const managers = [];
+  for (const id of company.managerJobIds || []) {
+    managers.push(await readJson(path.join(root, 'company', 'managers', id + '.json')));
+  }
+
+  const workItems = workState.items || [];
+  const incidents = incidentState.items || [];
+  const managerRuns = managerRunsState.runs || [];
+
+  const methodMap = new Map();
+  for (const manager of managers) {
+    for (const [role, ref] of [['manager',manager.managerMethod],['worker',manager.defaultWorkerMethod]]) {
+      if (!ref?.id) continue;
+      const key = role + ':' + ref.id + ':' + (ref.version || 'active');
+      if (!methodMap.has(key)) methodMap.set(key, await resolveMethod(root, role, ref));
     }
   }
+  for (const item of workItems) {
+    const ref = item.workerMethod;
+    if (!ref?.id) continue;
+    const key = 'worker:' + ref.id + ':' + (ref.version || 'active');
+    if (!methodMap.has(key)) methodMap.set(key, await resolveMethod(root, 'worker', ref));
+  }
+
+  const methods = [...methodMap.values()].map((method) => ({
+    role:method.spec.role,
+    id:method.spec.methodId,
+    title:method.manifest.title,
+    activeVersion:method.version,
+    runtimeRequirements:method.spec.runtimeRequirements || {},
+    qualityGates:method.spec.qualityGates || [],
+  }));
 
   const counts = Object.fromEntries(WORK_STATES.map((status) => [
     status,
@@ -179,88 +160,15 @@ export async function loadSnapshot(rootInput) {
     managers,
     workItems,
     incidents,
+    managerState:managersState,
     managerRuns,
-    managerLeases,
-    methods: methodSummaries,
+    methods,
     counts,
-    generatedAt: nowIso(),
-  };
-}
-
-export async function createWorkItem(rootInput, input = {}) {
-  const root = rootInput || await findRepoRoot();
-  const id = input.id || newId('wi');
-  const createdAt = nowIso();
-  const item = {
-    schemaVersion:1,
-    id,
-    title:String(input.title || 'Untitled Work Item'),
-    objective:String(input.objective || ''),
-    status:input.status || 'ready',
-    priority:PRIORITIES.includes(input.priority) ? input.priority : 'medium',
-    managerJobId:input.managerJobId || 'general-manager',
-    workerMethod:input.workerMethod || { id:'general-worker', version:'active' },
-    workerMethodVersion:null,
-    dedupeKey:input.dedupeKey || null,
-    acceptanceCriteria:Array.isArray(input.acceptanceCriteria) ? input.acceptanceCriteria : [],
-    execution:{
-      requiredTools:input.execution?.requiredTools || ['github'],
-      requiredCapabilities:input.execution?.requiredCapabilities || ['repo_read','repo_write'],
-      validationStrategy:input.execution?.validationStrategy || { type:'explicit', checks:[] },
-      deliveryMode:input.execution?.deliveryMode || 'direct_commit',
+    revisions:{
+      workItems:workState.revision,
+      incidents:incidentState.revision,
+      managers:managersState.revision,
+      managerRuns:managerRunsState.revision,
     },
-    claim:null,
-    escalation:null,
-    executionReceipt:null,
-    resultSummary:null,
-    createdAt,
-    updatedAt:createdAt,
-    finishedAt:null,
   };
-  const errors = validateWorkItem(item);
-  if (errors.length) throw new Error(errors.join('; '));
-  await writeJsonAtomic(path.join(root, 'company', 'state', 'work-items', id + '.json'), item);
-  return item;
-}
-
-export async function patchWorkItem(rootInput, id, patch = {}) {
-  const root = rootInput || await findRepoRoot();
-  const file = path.join(root, 'company', 'state', 'work-items', id + '.json');
-  const current = await readJson(file);
-  const next = { ...current, ...patch, updatedAt: nowIso() };
-  if (patch.status === 'archived' && !patch.finishedAt) next.finishedAt = nowIso();
-  if (patch.status && patch.status !== 'running' && !('claim' in patch)) next.claim = null;
-  const errors = validateWorkItem(next);
-  if (errors.length) throw new Error(errors.join('; '));
-  await writeJsonAtomic(file, next);
-  return next;
-}
-
-export async function createIncident(rootInput, input = {}) {
-  const root = rootInput || await findRepoRoot();
-  const id = input.id || newId('inc');
-  const openedAt = nowIso();
-  const incident = {
-    schemaVersion:1,
-    id,
-    title:String(input.title || 'Untitled Incident'),
-    status:input.status || 'open',
-    severity:input.severity || 'medium',
-    detectedBy:input.detectedBy || 'human',
-    managerJobIds:input.managerJobIds || ['general-manager'],
-    relatedWorkItemIds:input.relatedWorkItemIds || [],
-    symptom:String(input.symptom || ''),
-    rootCause:input.rootCause || null,
-    fix:input.fix || null,
-    regressionCheck:input.regressionCheck || null,
-    prevention:input.prevention || null,
-    operatingModelChanged:Boolean(input.operatingModelChanged),
-    githubIssue:input.githubIssue || null,
-    openedAt,
-    resolvedAt:input.resolvedAt || null,
-  };
-  const errors = validateIncident(incident);
-  if (errors.length) throw new Error(errors.join('; '));
-  await writeJsonAtomic(path.join(root, 'company', 'state', 'incidents', id + '.json'), incident);
-  return incident;
 }
