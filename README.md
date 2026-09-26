@@ -2,26 +2,26 @@
 
 A **GitHub-native agent company template**.
 
-GitHub remote is the control plane, durable state store, audit log, and delivery workspace. External agents enter through GitHub MCP. Humans observe the same canonical state through a read-only GitHub Pages Panel.
+GitHub remote is the control plane. **GitHub Issues are the Work Item / System Incident database.** External agents enter through GitHub MCP. Humans observe the same state through a read-only GitHub Pages Panel.
 
-No remote database or application server is required.
+No remote database or application server is required for the default public-repository setup.
 
 ```text
 Human
   ↓ mission / boundaries
 Manager
   ↓ Observe → Reconcile → Decide → Delegate
-Work Item
+GitHub Issue = Work Item
   ↓
 Worker
-  ↓ Execute → Validate → Deliver
+  ↓ claim → execute → validate → deliver
 Manager
-  ↓ escalation / incidents / improvement
+  ↓ escalation / Incident Issue / improvement
 ```
 
 ## Core idea
 
-> **The scheduler is the alarm clock. The repository is the company.**
+> **The scheduler is the alarm clock. GitHub is the company.**
 
 The repository owns:
 
@@ -30,63 +30,108 @@ The repository owns:
 - `company/DECISION_LOG.md` — why important operating choices changed
 - `company/managers/` — mission-owning Manager Jobs
 - `company/methods/` — versioned Manager/Worker manuals + runtime requirements
-- `company/state/*.json` — canonical operational state
+- GitHub Issues — Work Items and System Incidents
+- `company/claims/` — short-lived Worker claim mutexes
+- `company/state/managers.json` — Manager leases/state
+- `company/state/manager-runs.json` — Manager Run history
 - `workspace/` — mission-specific deliverables
 - root `index.html / panel.js / panel.css` — read-only human Panel
 
-## Simple aggregate state
+## Work Item = GitHub Issue
 
-The default template starts with four known JSON files:
+A Work Item is a normal GitHub Issue with a hidden machine-readable metadata block in its body.
+
+Example:
+
+```markdown
+<!-- agents-company:meta
+{
+  "schemaVersion": 1,
+  "kind": "work",
+  "status": "ready",
+  "priority": "high",
+  "managerJobId": "general-manager",
+  "workerMethod": { "id": "general-worker", "version": "active" },
+  "workerMethodVersion": null,
+  "execution": {
+    "requiredTools": ["github"],
+    "requiredCapabilities": ["repo_read", "repo_write"],
+    "validationStrategy": { "type": "explicit", "checks": [] },
+    "deliveryMode": "direct_commit"
+  }
+}
+-->
+
+## Objective
+
+Produce the requested deliverable.
+
+## Acceptance criteria
+
+- ...
+```
+
+This lets GitHub provide the things it already does well:
+
+- IDs/numbers,
+- human-readable UI,
+- comments,
+- notifications,
+- search,
+- history,
+- links to PRs,
+- open/closed lifecycle.
+
+The hidden JSON provides the Agent contract.
+
+Templates live under `company/templates/` and `.github/ISSUE_TEMPLATE/`.
+
+## Atomic Work Item claim
+
+The Issue is the task. A tiny Issue-specific repository file is the mutex:
+
+```text
+company/claims/issue-123.json
+```
+
+Worker claim:
+
+1. Read Issue #123 and its Worker Method.
+2. Verify runtime requirements.
+3. If no live lock exists, attempt GitHub **create file** for `company/claims/issue-123.json`.
+4. Only one concurrent create can win.
+5. Winner updates Issue metadata to `running`.
+6. Loser chooses another Issue.
+
+Heartbeat extends the lock lease using current-SHA update.
+
+Completion/problem transition updates the Issue first, then deletes the lock.
+
+Issue assignees/labels may improve visibility but are not the ownership lock.
+
+## Manager state
+
+Manager leases and Run history are the only remaining aggregate repository state:
 
 ```text
 company/state/
-  work-items.json
-  incidents.json
   managers.json
   manager-runs.json
 ```
 
-This keeps GitHub MCP usage and GitHub Pages rendering extremely simple.
-
-### Claim / write concurrency
-
-Agents use the current GitHub blob SHA as compare-and-swap:
-
-1. fetch the aggregate JSON + SHA,
-2. inspect the latest state,
-3. modify only the intended Work Item / Incident / Manager entry,
-4. update the file using that SHA,
-5. stale SHA → refetch, re-evaluate, reapply only that intended change.
-
-The template intentionally accepts occasional retries before introducing sharded state.
+They use GitHub blob-SHA optimistic writes.
 
 ## Methods, not scheduler manuals
 
 Schedulers own **when** to wake an Agent.
 
-Detailed execution behavior belongs in versioned Manager/Worker Methods inside the repository.
+Detailed behavior belongs in versioned Manager/Worker Methods inside the repository.
 
-See [docs/GITHUB_MCP_BOOTSTRAP.md](docs/GITHUB_MCP_BOOTSTRAP.md) for thin trigger prompts.
-
-## Runtime requirements
-
-Methods declare tools/capabilities they require. Work Items may add task-specific requirements.
-
-An Agent reports only tools actually available in the current invocation. Missing required runtime prevents claim and follows the normal Worker → Manager escalation path.
-
-## Issues and PRs are auxiliary
-
-Canonical queue state stays in aggregate JSON.
-
-Use GitHub Issues for human-native notification/discussion such as credentials, permissions, policy, or human-only decisions.
-
-Use PRs when a deliverable should be reviewed before entering `main`.
-
-Store Issue/PR references back on the canonical Work Item/Incident.
+See [docs/GITHUB_MCP_BOOTSTRAP.md](docs/GITHUB_MCP_BOOTSTRAP.md).
 
 ## Read-only GitHub Pages Panel
 
-The Panel is already a static site at repository root:
+The root Panel is static:
 
 ```text
 index.html
@@ -94,21 +139,9 @@ panel.js
 panel.css
 ```
 
-It directly fetches:
-
-- `company/company.json`
-- `company/state/work-items.json`
-- `company/state/incidents.json`
-- `company/state/managers.json`
-- `company/state/manager-runs.json`
-- Manager/Worker Method files
-- Operating Model / Decision Log / Agent Contract / Architecture
-
-There is no Node Panel server and no write API.
+For this public repository, it reads Work/Incident Issues directly from GitHub's public REST API and reads Methods/governance files from GitHub Pages.
 
 ### Publish it
-
-In GitHub:
 
 ```text
 Settings
@@ -120,37 +153,36 @@ Settings
 → Save
 ```
 
-No custom GitHub Actions deployment workflow is required for this default setup.
+No custom Actions deployment workflow is required for this public default.
 
-## Validate the repository model
+### Private repositories
 
-Optional local/CI validation remains zero-dependency:
+Private repository Issues require authenticated GitHub API access. Do **not** put a token in browser JavaScript.
+
+Options are described in [docs/PRIVATE_REPOSITORY.md](docs/PRIVATE_REPOSITORY.md).
+
+Important: a Pages site sourced from a private repository is not automatically private. Treat any static snapshot published to a public Pages site as public data.
+
+## Validation
+
+Repository-side control-plane files remain zero-dependency:
 
 ```bash
 npm test
 npm run validate
 ```
 
-A manual-only workflow also exists at `.github/workflows/validate-manual.yml`; it does not consume Actions on every push.
+The manual workflow `.github/workflows/validate-manual.yml` is optional and does not run on every push.
 
-Validation checks include:
-
-- Manager Method references exist,
-- ready Work Items have Worker Methods + validation strategies,
-- running Work Items have claims + pinned Worker Method versions,
-- review means validation-complete,
-- duplicate open dedupe keys are rejected,
-- resolved Incidents contain root cause / fix / regression / prevention.
-
-## Customize this template
+## Customize
 
 1. Edit `company/company.json`.
-2. Rewrite/create Manager Jobs under `company/managers/`.
-3. Add Manager IDs to `company.company.json > managerJobIds`.
-4. Create immutable Manager/Worker Method versions.
-5. Initialize new Manager state in `company/state/managers.json`.
-6. Put mission-specific output under `workspace/` or add normal monorepo packages/apps.
-7. Invoke Managers/Workers externally with GitHub MCP.
+2. Define Manager Jobs.
+3. Create Manager/Worker Method v1s.
+4. Initialize Manager state.
+5. Let Managers create Work Issues.
+6. Invoke Managers/Workers externally through GitHub MCP.
+7. Put deliverables under `workspace/` or normal monorepo packages/apps.
 
 See [docs/CUSTOMIZING.md](docs/CUSTOMIZING.md).
 
@@ -166,18 +198,16 @@ agents-company/
 │  ├─ company.json
 │  ├─ OPERATING_MODEL.md
 │  ├─ DECISION_LOG.md
+│  ├─ claims/
 │  ├─ managers/
 │  ├─ methods/
 │  │  ├─ manager/
 │  │  └─ worker/
 │  ├─ state/
-│  │  ├─ work-items.json
-│  │  ├─ incidents.json
 │  │  ├─ managers.json
 │  │  └─ manager-runs.json
 │  └─ templates/
-├─ packages/
-│  └─ core/
+├─ packages/core/
 ├─ schemas/
 ├─ docs/
 ├─ workspace/
