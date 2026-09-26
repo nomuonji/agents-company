@@ -143,6 +143,8 @@ For a new company:
 5. Put mission-specific deliverables under `workspace/` or add your own monorepo packages/apps.
 6. Use the bootstrap prompts with any scheduler/agent runtime that can reach GitHub.
 
+See [docs/CUSTOMIZING.md](docs/CUSTOMIZING.md) for research / software / content / knowledge-company patterns.
+
 Do not put detailed work manuals back into the scheduler.
 
 ## Repository layout
