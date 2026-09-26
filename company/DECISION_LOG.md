@@ -2,48 +2,37 @@
 
 ## 2026-09-27 — GitHub remote is the control plane
 
-**Decision:** No remote database is required. GitHub remote stores the canonical company manuals, Methods, operational state, and deliverables.
+**Decision:** No remote database is required. GitHub remote stores the canonical company manuals, Methods, Manager state, Work Items, Incidents, and deliverables.
 
-**Why:** External Agents can participate with GitHub MCP alone. Git provides durable history, diffs, rollback, and optimistic writes.
-
----
-
-## 2026-09-27 — Aggregate JSON is the default state model
-
-**Decision:** The initial template stores live operational state in four known aggregate files:
-
-- `company/state/work-items.json`
-- `company/state/incidents.json`
-- `company/state/managers.json`
-- `company/state/manager-runs.json`
-
-**Why:** This keeps GitHub-MCP operation and a fully static GitHub Pages Panel simple. No directory discovery, remote database, generated snapshot, or local application server is required.
-
-**Concurrency:** GitHub blob SHA is the compare-and-swap token. A stale write fails; the Agent refetches the latest aggregate file, re-evaluates the operation, reapplies only its intended entity mutation, and retries.
-
-**Future threshold:** shard state only after measured write contention justifies the added complexity.
+**Why:** External Agents can participate with GitHub MCP alone. GitHub already provides durable history, discussion, search, IDs, notifications, and review primitives.
 
 ---
 
-## 2026-09-27 — GitHub Issues and PRs are auxiliary
+## 2026-09-27 — Work Items are GitHub Issues
 
-**Decision:** Aggregate JSON remains canonical operational state.
+**Decision:** A Work Item is a GitHub Issue with an `agents-company:meta` block whose `kind` is `work`.
 
-Use GitHub Issues for human-native notification/discussion such as credentials, permissions, policy, or a human-only decision.
-
-Use pull requests when a deliverable should be reviewed before entering the default branch.
-
-**Why:** Issues/PRs are excellent interaction and review surfaces, but they should not become a second queue database.
+**Why:** GitHub Issues already provide stable IDs, title/body, open/closed lifecycle, comments, human discussion, search, history, and PR linking. Rebuilding those features in `work-items.json` adds unnecessary state.
 
 ---
 
-## 2026-09-27 — SHA compare-and-swap is the default Work Item claim lock
+## 2026-09-27 — System Incidents are GitHub Issues
 
-**Decision:** Workers claim Work Items by current-SHA update of `work-items.json`.
+**Decision:** A structural Incident is a GitHub Issue with `kind: incident`.
 
-**Why:** It is already atomic enough for the simple template: if two Workers race for the same item, only the first current-SHA update succeeds. The loser refetches and chooses again.
+**Why:** Incidents benefit from the same native discussion/history/search surface as Work Items, and they should be visible to humans without a second UI/database.
 
-**Issue-based alternative considered:** an append-only Issue-comment claim ledger can deterministically choose the earliest valid claim, but it introduces a second claim state, lease/renew/release events, and more GitHub API reads. It is not the default unless measured aggregate-file contention becomes problematic.
+---
+
+## 2026-09-27 — Claim ownership uses one Issue-specific lock file
+
+**Decision:** Work Issue #N is claimed by atomically creating `company/claims/issue-N.json`.
+
+**Why:** GitHub Issue assignees/labels are useful presentation fields but are not a strong compare-and-set ownership primitive. GitHub's create-file operation on a unique path is: only one concurrent claimant can create a previously absent lock path.
+
+**Lease:** The lock is short-lived, heartbeat-able, and recoverable after expiry.
+
+**Canonical task record:** The Issue remains the Work Item. The lock file is only a mutex.
 
 ---
 
@@ -59,8 +48,10 @@ The template starts with `general-manager@v1` and `general-worker@v1`.
 
 ## 2026-09-27 — Panel is GitHub Pages read-only
 
-**Decision:** The root static Panel fetches canonical repository JSON/Markdown directly and never writes state.
+**Decision:** The root static Panel never writes company state.
 
-**Why:** Agents already mutate GitHub remote through GitHub MCP. A write-capable local Panel would create an unnecessary second mutation path and local/remote synchronization problem.
+For public repositories it reads Work/Incident Issues directly from GitHub's public Issues API and reads Methods/governance files from Pages.
 
-**Deployment:** GitHub Pages can publish the `main` branch repository root directly. No application server, render step, snapshot generation, or custom Pages deployment workflow is required.
+For private repositories, private Issue data requires an authenticated server-side snapshot or backend; browser code must not contain a reusable repository credential.
+
+**Why:** Agents already mutate GitHub remote through GitHub MCP. The human Panel should remain a projection, not another mutation path.
