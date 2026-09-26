@@ -13,19 +13,15 @@ Keep it broad enough to survive individual tasks, but concrete enough that a Man
 Create one Manager Job per independently owned mission.
 
 Examples:
+
 - `research-manager`
 - `product-manager`
 - `content-manager`
 - `site-operations-manager`
 
-Each Manager Job should have:
-- measurable mission,
-- Manager Method,
-- default Worker Method,
-- concurrency policy,
-- optional ready-inventory target.
+Add its ID to `company/company.json > managerJobIds`.
 
-Create a matching file under `company/state/manager-leases/`.
+Initialize its Manager state inside `company/state/managers.json`.
 
 ## 3. Methods
 
@@ -59,8 +55,8 @@ Manager runtime:
 - analytics/search data when available
 
 Worker delivery:
-- content/code change
-- explicit production/live validation
+- content/code changes
+- explicit live/production validation
 
 ### Personal knowledge company
 
@@ -70,7 +66,8 @@ Manager + Worker may need only GitHub. Deliverables can be notes, structured dat
 
 Keep scheduler prompts thin.
 
-A trigger should identify:
+A trigger identifies:
+
 - repository,
 - Manager Job or Worker role.
 
@@ -78,19 +75,22 @@ Everything else belongs in `AGENTS.md`, the Operating Model, Methods, and Work I
 
 ## Multiple Workers
 
-You do not need one Worker process per Method. A generic external Agent can inspect candidate Work Items, resolve each Worker Method, compare runtime requirements, and claim only compatible work.
+A generic external Agent can inspect `work-items.json`, resolve candidate Worker Methods, compare runtime requirements, and claim only compatible work.
+
+Because Work Items share one aggregate file, concurrent writes can conflict. This is expected: refetch the latest SHA, re-evaluate, and reapply only the intended Work Item mutation.
+
+Do not split state files preemptively. Shard only when measured contention justifies the complexity.
 
 ## Adding a tool
 
-Do not add tool names only to prompts.
-
 1. Add the tool/capability to the relevant Method version or task-specific Work Item execution requirements.
 2. Let the runtime report actual availability.
-3. Missing requirement should block before claim and escalate through the normal Worker→Manager route.
+3. Missing requirements block before claim and escalate through Worker → Manager.
 
 ## Evolving the company
 
 For important operating changes:
+
 1. create/fix the Incident if one exists,
 2. add a new immutable Method version,
 3. switch the manifest `activeVersion`,
