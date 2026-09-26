@@ -1,73 +1,88 @@
 # Agents Company — Agent Entry Contract
 
-This repository is the company. Git is the durable control plane; `company/` is the operational state store.
+This repository is the company. GitHub remote is the durable control plane and canonical state store. External agents are expected to enter through GitHub MCP or another GitHub client.
 
-External agents are expected to enter through GitHub MCP or another GitHub client. Do not assume a local shell, database, scheduler, or other connector exists.
+Do not assume a local checkout, database, scheduler, server, or other connector exists.
 
 ## 1. Bootstrap
 
-Every agent starts by reading, in this order:
+Every agent starts by reading:
 
 1. `company/company.json`
 2. `company/OPERATING_MODEL.md`
 3. the relevant Manager Job in `company/managers/`
-4. the referenced Method manifest + pinned/active version under `company/methods/`
-5. current state under `company/state/`
+4. the referenced Method manifest + pinned/active version
+5. canonical aggregate state files under `company/state/`
 
-The scheduler owns **when to wake up**. It should not duplicate the manuals stored here.
+The scheduler owns **when to wake up**. It must not duplicate the manuals stored here.
 
-If GitHub itself is unavailable, the repository cannot record an Incident. Stop rather than improvising and report the bootstrap failure to the human through the calling environment.
+If GitHub itself is unavailable, stop rather than improvising and report the bootstrap failure through the calling environment.
 
-## 2. Roles
+## 2. Canonical state
+
+The initial/simple storage model deliberately uses a few aggregate JSON files:
+
+- `company/state/work-items.json`
+- `company/state/incidents.json`
+- `company/state/managers.json`
+- `company/state/manager-runs.json`
+
+The Panel, Manager, and Worker all read the same files.
+
+Do not create a second queue in Issues, GitHub Projects, chat memory, scheduler prompts, or a local database.
+
+## 3. Roles
 
 ### Manager
+
 - Owns a measurable mission.
 - Observe → Reconcile → Decide → Delegate.
 - Triage Worker escalations before generating more work.
-- Creates executable Work Items; does not perform the underlying Worker task.
+- Creates executable Work Items; does not perform Worker implementation.
 - Creates System Incidents only for structural / recurring / cross-task / manager-unresolvable problems.
 
 ### Worker
+
 - Selects only executable Work Items.
-- Reads the Worker Method and Work Item execution contract before claim.
-- Claims one Work Item atomically by updating that Work Item file with its current GitHub blob SHA.
-- Executes, validates, records a receipt, then closes or reports a problem.
+- Reads Worker Method + Work Item execution contract before claim.
+- Claims one Work Item by optimistic current-SHA update of `work-items.json`.
+- Executes, validates, records an execution receipt, then closes or reports a problem.
 - Does not normally create System Incidents directly.
 
-## 3. Canonical state
+## 4. Aggregate JSON concurrency
 
-Each entity is a separate file to reduce write contention.
+A write to an aggregate state file is an optimistic compare-and-swap:
 
-- Manager Jobs: `company/managers/*.json`
-- Manager leases: `company/state/manager-leases/*.json`
-- Manager Runs: `company/state/manager-runs/*.json`
-- Work Items: `company/state/work-items/*.json`
-- Incidents: `company/state/incidents/*.json`
-- Methods: `company/methods/<role>/<method>/...`
+1. Fetch the current file and retain its blob SHA.
+2. Parse the latest JSON.
+3. Modify only the intended entity/entities.
+4. Update the same file using the fetched SHA.
+5. If GitHub rejects the stale SHA, refetch the latest file.
+6. Re-evaluate the operation against the new state.
+7. Reapply only your intended change and retry.
 
-Do not create a second queue in Issues, Projects, chat memory, or scheduler prompts.
+Never force-overwrite a newer state file.
 
-## 4. Manager lease and run protocol
+This simple model intentionally favors portability over maximum write parallelism. If real contention later becomes material, a future Method/Operating Model revision may shard state by Manager or Work Item.
+
+## 5. Manager lease and run protocol
 
 For a Manager Job:
 
-1. Fetch `company/state/manager-leases/<managerJobId>.json` and keep its blob SHA.
-2. If `leaseExpiresAt` is still in the future for another actor, do not start another Manager cycle when the Job uses `skip_if_live_lease`.
-3. Resolve the Manager Method active version and compare its runtime requirements with tools/capabilities actually available now.
-4. Create a unique Manager Run ID.
-5. Claim the lease with a current-SHA update:
-   - `claimedBy`
-   - `runnerId`
-   - `claimedAt`
-   - `leaseExpiresAt`
-   - `managerRunId`
-6. Create `company/state/manager-runs/<runId>.json` and pin the exact Manager Method version.
-7. Run Observe → Reconcile → Decide → Delegate.
-8. Finish the Manager Run, then release the lease with another current-SHA update.
+1. Fetch `company/state/managers.json` + SHA.
+2. Read `managers[managerJobId].lease`.
+3. If the Job uses `skip_if_live_lease` and another live lease exists, stop.
+4. Resolve the active Manager Method version.
+5. Compare Method runtime requirements with tools/capabilities actually available now.
+6. Create a unique Manager Run ID.
+7. Update `managers.json` with the lease using the current SHA.
+8. Append the Manager Run to `manager-runs.json` and pin the exact Manager Method version.
+9. Run Observe → Reconcile → Decide → Delegate.
+10. Finish the Manager Run and release the Manager lease.
 
-If the lease SHA update conflicts, refetch and reconsider. Never force-overwrite another Manager.
+Any stale-SHA conflict requires refetch/re-evaluation.
 
-## 4. Work Item states
+## 6. Work Item states
 
 - `backlog`: deliberately deferred
 - `ready`: unclaimed and executable by the intended Worker
@@ -79,28 +94,31 @@ If the lease SHA update conflicts, refetch and reconsider. Never force-overwrite
 
 Never use `review` as a generic failure/handoff bucket.
 
-## 5. Atomic claim protocol over GitHub MCP
+## 7. Worker claim protocol
 
-For a Work Item:
-
-1. Fetch `company/state/work-items/<id>.json` and keep the returned blob SHA.
-2. Confirm status is claimable and any existing lease is expired.
-3. Resolve the Work Item's Worker Method active version if `workerMethodVersion` is not yet pinned.
-4. Compare Method + Work Item runtime requirements with tools/capabilities actually available in this invocation.
-5. If requirements are missing, do **not** claim. Record a Worker escalation on the Work Item and move it to `blocked`.
-6. Otherwise update the same Work Item using the fetched SHA:
+1. Fetch `company/state/work-items.json` + SHA.
+2. Select an executable Work Item: prefer resumable `in_progress`, then highest-priority `ready`.
+3. Confirm no live claim belongs to another Agent.
+4. Resolve active Worker Method version unless already pinned.
+5. Merge Method runtime requirements with Work Item-specific requirements.
+6. Compare with tools/capabilities actually available in this invocation.
+7. Missing requirement → do not claim; update the item to `blocked` with a structured escalation to Manager.
+8. Otherwise set:
    - status = `running`
-   - claim.agentId / runnerId / claimedAt / leaseExpiresAt
-   - pin `workerMethodVersion`
-7. If the SHA update conflicts, another actor changed the item. Refetch and reconsider; never force-overwrite.
+   - `workerMethodVersion`
+   - `claim.agentId`
+   - `claim.runnerId`
+   - `claim.claimedAt`
+   - `claim.leaseExpiresAt`
+   - runtime availability
+9. Update `work-items.json` with the fetched SHA.
+10. On conflict, refetch and reconsider.
 
-GitHub's content-SHA precondition is the concurrency primitive.
+Long work should heartbeat by extending its lease through the same optimistic update process.
 
-Long work should heartbeat by extending `claim.leaseExpiresAt` with another current-SHA update.
+## 8. Worker problem report
 
-## 6. Worker problem report
-
-On an execution problem, update the Work Item with:
+A blocked Work Item records:
 
 ```json
 {
@@ -118,53 +136,45 @@ On an execution problem, update the Work Item with:
 }
 ```
 
-Use `in_progress` instead of `blocked` only when a known compatible route exists.
+Use `in_progress` only when a known compatible route exists.
 
-## 7. Manager triage and Incidents
+## 9. Manager triage and System Incidents
 
-Manager first tries to fix the Work Item itself: scope, bundle, validation, priority, route.
+Manager first tries to repair the Work Item: scope, validation, priority, route, or bundle.
 
-Create `company/state/incidents/<id>.json` only when:
+Create/update an entry in `incidents.json` only when:
+
 - the same class of failure recurs,
-- one Work Item fix would not prevent recurrence,
+- one Work Item repair would not prevent recurrence,
 - Operating Model / Method / code / schema / connector / scheduler must change,
 - Manager cannot resolve through normal reconciliation,
-- data loss, auth, permissions, or safety boundaries are involved.
+- data loss, auth, permission, or safety boundaries are involved.
 
-Incident resolution requires:
-Detect → Diagnose → Repair → Regression check → Prevention.
+Incident resolution requires Detect → Diagnose → Repair → Regression check → Prevention.
 
-## 8. Runtime requirements
+## 10. Runtime requirements
 
-Methods declare required and optional tools/capabilities. Work Items can add task-specific requirements.
+Method versions declare required/optional tools and capabilities. Work Items may add task-specific requirements.
 
 Agents report only tools actually available in the current invocation. Do not infer a tool merely because the repository mentions it.
 
-## 9. GitHub Issues / PRs
+## 11. Issues / PRs
 
-Repository files remain canonical state.
+Aggregate JSON state remains canonical.
 
-Use Issues only when native human notification/discussion is useful, such as:
-- human-only credential/action request,
-- policy/product decision,
-- long discussion that benefits from GitHub conversation.
+Use Issues only when native human notification/discussion helps, such as credentials, permissions, policy, or a human-only decision.
 
-Link the Issue number from the canonical Work Item/Incident.
+Use PRs when the deliverable itself should be reviewed before entering the default branch.
 
-Use PRs when the deliverable itself should be reviewed before entering the default branch:
-- code change,
-- high-risk configuration,
-- content requiring explicit approval.
+Store Issue/PR references back on the canonical Work Item or Incident.
 
-Link the PR from `executionReceipt.artifacts`.
+Routine queue state transitions are direct optimistic updates to aggregate state JSON, not PRs.
 
-Routine state transitions should be direct current-SHA updates to the state file, not PRs.
+## 12. Completion
 
-## 10. Completion
+A Worker may archive normal work when acceptance criteria and required validation are complete.
 
-A Worker can archive normal work without Manager approval when acceptance criteria and validation are satisfied.
-
-A completed Work Item records:
+Record:
 
 - `resultSummary`
 - `executionReceipt.deliveryStatus`
@@ -172,4 +182,4 @@ A completed Work Item records:
 - `executionReceipt.validation`
 - `finishedAt`
 
-Use `review` only when implementation and validation are done and a judgment remains.
+Use `review` only when implementation and validation are complete and only judgment remains.
