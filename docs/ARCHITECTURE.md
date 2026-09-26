@@ -1,15 +1,18 @@
 # Architecture
 
-## GitHub-native company
+## GitHub is the platform
 
-The least-capable remote Agent is assumed to have authenticated GitHub read/write access through MCP.
+The least-capable Agent is assumed to have authenticated GitHub read/write access through MCP.
 
-The core primitives are:
+The system uses GitHub primitives directly:
 
-- GitHub Issues for Work Items and System Incidents,
-- repository files for Methods, governance, Manager state, and short-lived claim locks,
-- pull requests for reviewable deliverables,
-- GitHub Pages for read-only human visibility.
+- Issues → Work Items / System Incidents
+- Issue comments → discussion / evidence / escalation
+- repository files → Methods / Operating Model / Manager state
+- unique claim files → Worker mutex
+- pull requests → reviewable deliverables
+- Git history → audit log
+- GitHub Pages → read-only human Panel
 
 No remote database or always-on orchestration server is required.
 
@@ -23,60 +26,52 @@ Issue body contains a hidden machine-readable metadata block:
 -->
 ```
 
-Human-readable instructions/discussion stay in normal Markdown/comments.
+Human-readable task/failure context remains regular Markdown.
 
-Work templates live under `company/templates/`.
+Closing a completed Work Issue represents `archived`.
 
-## Atomic Worker claim
+Closing a resolved Incident Issue represents `resolved`.
 
-Issue #123 is protected by:
+## Worker claim concurrency
+
+For Issue #123:
 
 ```text
 company/claims/issue-123.json
 ```
 
-A Worker attempts to create that path.
+is the mutex.
 
-- first create succeeds → ownership acquired,
-- later create sees existing path → claim lost,
-- heartbeat updates the lock by current SHA,
-- expired lock may be removed by current SHA and recreated,
-- completion/problem transition updates the Issue first, then removes the lock.
+Creating a previously nonexistent path is the atomic race. Only one claimant can win.
 
-This is intentionally separate from Issue assignee/labels.
+Heartbeat uses current-SHA update. Completion/problem transition updates the Issue first and then removes the lock. Expired locks are recoverable.
 
-## Manager state
+## Manager concurrency
 
-Manager lease and Run history remain in:
+Manager lease state remains in `company/state/managers.json` and uses current-SHA optimistic writes.
 
-- `company/state/managers.json`
-- `company/state/manager-runs.json`
+## GitHub Pages
 
-These use current-SHA optimistic writes.
+### Public repository
 
-## Pull requests
+The static Panel can call the public Issues API without authentication and fetch repository files from Pages.
 
-PRs are delivery/review surfaces for changes that should not land directly. Store the PR reference in the Work Issue execution receipt.
+No custom build is needed.
 
-## Public GitHub Pages Panel
+### Private repository
 
-The root Panel calls the public repository Issues API directly and filters Issues by `agents-company:meta`.
+Private Issue API requests require authentication. Client-side Pages must not contain a personal access token or GitHub App secret.
 
-No generated snapshot is required for a public repository.
+Use either:
 
-## Private repositories
+- an authenticated backend/proxy,
+- a server-side build/snapshot that publishes only the fields safe to expose,
+- or an Enterprise private Pages setup combined with an appropriate authenticated data path.
 
-Authenticated GitHub APIs can read private Issues when the caller has repository Issues read permission.
-
-A static browser page must not embed a reusable repository credential. Therefore a private repository needs either:
-
-- an authenticated backend/proxy, or
-- a server-side build step that writes a read-only Issue snapshot for the Panel.
-
-See `docs/PRIVATE_REPOSITORY.md`.
+A private source repository does not by itself make ordinary Pages output confidential.
 
 ## Scheduler
 
-External scheduler prompts identify the repository + Manager Job or Worker role and tell the Agent to read `AGENTS.md`.
+The external scheduler identifies the repository + Manager Job or Worker role and tells the Agent to read `AGENTS.md`.
 
-Detailed operating rules stay in the repository.
+Detailed operating rules remain repository-owned.
