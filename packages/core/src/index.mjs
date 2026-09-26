@@ -1,7 +1,7 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
-export const WORK_STATES = ['backlog','ready','in_progress','running','blocked','review','archived'];
+export const WORK_STATES = ['backlog','ready','running','in_progress','blocked','review','archived'];
 
 export async function findRepoRoot(start = process.cwd()) {
   let current = path.resolve(start);
@@ -74,101 +74,81 @@ export async function resolveMethod(root, role, ref) {
   return { manifest, version, spec, manual };
 }
 
-export function validateWorkItem(item) {
+export function parseIssueMeta(body = '') {
+  const match = String(body).match(/<!--\s*agents-company:meta\s*([\s\S]*?)-->/);
+  if (!match) return null;
+  try { return JSON.parse(match[1].trim()); }
+  catch { return null; }
+}
+
+export function validateWorkIssueMeta(meta) {
   const errors = [];
-  if (!item?.id) errors.push('missing id');
-  if (!item?.title) errors.push('missing title');
-  if (!WORK_STATES.includes(item?.status)) errors.push('invalid status');
-  if (item?.status === 'ready') {
-    if (!item.workerMethod?.id) errors.push('ready item missing workerMethod');
-    if (!item.execution?.validationStrategy) errors.push('ready item missing execution.validationStrategy');
-  }
-  if (item?.status === 'running') {
-    if (!item.claim?.agentId) errors.push('running item missing claim.agentId');
-    if (!item.claim?.leaseExpiresAt) errors.push('running item missing claim.leaseExpiresAt');
-    if (!item.workerMethodVersion) errors.push('running item missing pinned workerMethodVersion');
-  }
-  if (item?.status === 'review' && item.executionReceipt?.validationComplete !== true) {
+  if (meta?.schemaVersion !== 1) errors.push('schemaVersion must be 1');
+  if (meta?.kind !== 'work') errors.push('kind must be work');
+  if (!WORK_STATES.includes(meta?.status)) errors.push('invalid status');
+  if (!['critical','high','medium','low'].includes(meta?.priority)) errors.push('invalid priority');
+  if (!meta?.managerJobId) errors.push('missing managerJobId');
+  if (!meta?.workerMethod?.id) errors.push('missing workerMethod.id');
+  if (!meta?.execution?.validationStrategy) errors.push('missing execution.validationStrategy');
+  if (meta?.status === 'running' && !meta?.workerMethodVersion) errors.push('running requires workerMethodVersion');
+  if (meta?.status === 'review' && meta?.executionReceipt?.validationComplete !== true) {
     errors.push('review requires executionReceipt.validationComplete=true');
   }
-  if (item?.status === 'archived' && !item.finishedAt) errors.push('archived item missing finishedAt');
+  if (meta?.status === 'archived' && !meta?.finishedAt) errors.push('archived requires finishedAt');
   return errors;
 }
 
-export function validateIncident(incident) {
+export function validateIncidentIssueMeta(meta) {
   const errors = [];
-  if (!incident?.id) errors.push('missing id');
-  if (!['open','investigating','resolved'].includes(incident?.status)) errors.push('invalid status');
-  if (!incident?.title) errors.push('missing title');
-  if (!incident?.symptom) errors.push('missing symptom');
-  if (incident?.status === 'resolved') {
+  if (meta?.schemaVersion !== 1) errors.push('schemaVersion must be 1');
+  if (meta?.kind !== 'incident') errors.push('kind must be incident');
+  if (!['open','investigating','resolved'].includes(meta?.status)) errors.push('invalid status');
+  if (!['low','medium','high','critical'].includes(meta?.severity)) errors.push('invalid severity');
+  if (!['worker','manager','human'].includes(meta?.detectedBy)) errors.push('invalid detectedBy');
+  if (!Array.isArray(meta?.managerJobIds)) errors.push('managerJobIds must be an array');
+  if (meta?.status === 'resolved') {
     for (const key of ['rootCause','fix','regressionCheck','prevention','resolvedAt']) {
-      if (!incident?.[key]) errors.push('resolved incident missing ' + key);
+      if (!meta?.[key]) errors.push('resolved incident missing ' + key);
     }
   }
   return errors;
 }
 
-export async function loadSnapshot(rootInput) {
+export async function loadRepositorySnapshot(rootInput) {
   const root = rootInput || await findRepoRoot();
   const company = await readJson(path.join(root, 'company', 'company.json'));
-  const workState = await readJson(path.join(root, 'company', 'state', 'work-items.json'));
-  const incidentState = await readJson(path.join(root, 'company', 'state', 'incidents.json'));
   const managersState = await readJson(path.join(root, 'company', 'state', 'managers.json'));
   const managerRunsState = await readJson(path.join(root, 'company', 'state', 'manager-runs.json'));
 
   const managers = [];
+  const methods = [];
+  const seen = new Set();
+
   for (const id of company.managerJobIds || []) {
-    managers.push(await readJson(path.join(root, 'company', 'managers', id + '.json')));
-  }
-
-  const workItems = workState.items || [];
-  const incidents = incidentState.items || [];
-  const managerRuns = managerRunsState.runs || [];
-
-  const methodMap = new Map();
-  for (const manager of managers) {
+    const manager = await readJson(path.join(root, 'company', 'managers', id + '.json'));
+    managers.push(manager);
     for (const [role, ref] of [['manager',manager.managerMethod],['worker',manager.defaultWorkerMethod]]) {
       if (!ref?.id) continue;
       const key = role + ':' + ref.id + ':' + (ref.version || 'active');
-      if (!methodMap.has(key)) methodMap.set(key, await resolveMethod(root, role, ref));
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const method = await resolveMethod(root, role, ref);
+      methods.push({
+        role,
+        id:method.spec.methodId,
+        title:method.manifest.title,
+        activeVersion:method.version,
+        runtimeRequirements:method.spec.runtimeRequirements || {},
+        qualityGates:method.spec.qualityGates || [],
+      });
     }
   }
-  for (const item of workItems) {
-    const ref = item.workerMethod;
-    if (!ref?.id) continue;
-    const key = 'worker:' + ref.id + ':' + (ref.version || 'active');
-    if (!methodMap.has(key)) methodMap.set(key, await resolveMethod(root, 'worker', ref));
-  }
-
-  const methods = [...methodMap.values()].map((method) => ({
-    role:method.spec.role,
-    id:method.spec.methodId,
-    title:method.manifest.title,
-    activeVersion:method.version,
-    runtimeRequirements:method.spec.runtimeRequirements || {},
-    qualityGates:method.spec.qualityGates || [],
-  }));
-
-  const counts = Object.fromEntries(WORK_STATES.map((status) => [
-    status,
-    workItems.filter((item) => item.status === status).length,
-  ]));
 
   return {
     company,
     managers,
-    workItems,
-    incidents,
     managerState:managersState,
-    managerRuns,
+    managerRuns:managerRunsState.runs || [],
     methods,
-    counts,
-    revisions:{
-      workItems:workState.revision,
-      incidents:incidentState.revision,
-      managers:managersState.revision,
-      managerRuns:managerRunsState.revision,
-    },
   };
 }
