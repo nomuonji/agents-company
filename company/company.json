@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "companyId": "agents-company",
+  "name": "Agents Company",
+  "description": "Repository-native multi-agent company template",
+  "mission": "Turn a human-defined mission into durable, reviewable work through Manager and Worker agents.",
+  "defaultManagerJobId": "general-manager",
+  "controlPlane": "git",
+  "canonicalStateRoot": "company/state",
+  "schedulerPolicy": "external-bootstrap-only",
+  "issuePolicy": "human-notification-and-discussion-only",
+  "pullRequestPolicy": "reviewable-deliverables-only",
+  "panel": {
+    "command": "npm run panel",
+    "url": "http://localhost:4310"
+  }
+}
