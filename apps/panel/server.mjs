@@ -42,7 +42,7 @@ async function gitStatus() {
 async function serveStatic(req, res, pathname) {
   const requested = pathname === '/' ? '/index.html' : pathname;
   const file = path.resolve(publicDir, '.' + requested);
-  if (!file.startsWith(publicDir)) return false;
+  if (file !== publicDir && !file.startsWith(publicDir + path.sep)) return false;
   try {
     const data = await fs.readFile(file);
     const ext = path.extname(file);
