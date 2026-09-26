@@ -3,9 +3,8 @@
   "id": "general-worker",
   "role": "worker",
   "title": "General Worker Method",
-  "activeVersion": "v2",
+  "activeVersion": "v1",
   "versions": [
-    "v1",
-    "v2"
+    "v1"
   ]
 }
