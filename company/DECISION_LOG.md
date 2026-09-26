@@ -1,64 +1,66 @@
 # Agents Company Decision Log
 
-## 2026-09-27 — Git repository is the control plane
+## 2026-09-27 — GitHub remote is the control plane
 
-**Decision:** No remote database is required. Operational entities live as separate JSON/Markdown files under `company/`.
+**Decision:** No remote database is required. GitHub remote stores the canonical company manuals, Methods, operational state, and deliverables.
 
-**Why:** External agents can participate using only GitHub MCP, state is portable/forkable/auditable, and optimistic SHA writes provide a usable concurrency primitive.
-
----
-
-## 2026-09-27 — Entity-per-file instead of one queue JSON
-
-**Decision:** Each Work Item, Run, Lease, and Incident has its own file.
-
-**Why:** Concurrent agents should not contend on one giant state document.
+**Why:** External Agents can participate with GitHub MCP alone. Git provides durable history, diffs, rollback, and optimistic writes.
 
 ---
 
-## 2026-09-27 — Issues and PRs are auxiliary
+## 2026-09-27 — Aggregate JSON is the default state model
 
-**Decision:** GitHub Issues are for human-native discussion/notification; PRs are for deliverables that benefit from review. Neither replaces canonical operational state.
+**Decision:** The initial template stores live operational state in four known aggregate files:
 
-**Why:** A general-purpose company needs a predictable machine-readable queue even when no Issue/PR is appropriate.
+- `company/state/work-items.json`
+- `company/state/incidents.json`
+- `company/state/managers.json`
+- `company/state/manager-runs.json`
+
+**Why:** This keeps GitHub-MCP operation and a fully static GitHub Pages Panel simple. No directory discovery, remote database, generated snapshot, or local application server is required.
+
+**Concurrency:** GitHub blob SHA is the compare-and-swap token. A stale write fails; the Agent refetches the latest aggregate file, re-evaluates the operation, reapplies only its intended entity mutation, and retries.
+
+**Future threshold:** shard state only after measured write contention justifies the added complexity.
 
 ---
 
-## 2026-09-27 — Methods own manuals, schedulers only bootstrap
+## 2026-09-27 — GitHub Issues and PRs are auxiliary
 
-**Decision:** Manager/Worker procedures and runtime requirements live in versioned Methods inside the repository.
+**Decision:** Aggregate JSON remains canonical operational state.
+
+Use GitHub Issues for human-native notification/discussion such as credentials, permissions, policy, or a human-only decision.
+
+Use pull requests when a deliverable should be reviewed before entering the default branch.
+
+**Why:** Issues/PRs are excellent interaction and review surfaces, but they should not become a second queue database.
+
+---
+
+## 2026-09-27 — SHA compare-and-swap is the default Work Item claim lock
+
+**Decision:** Workers claim Work Items by current-SHA update of `work-items.json`.
+
+**Why:** It is already atomic enough for the simple template: if two Workers race for the same item, only the first current-SHA update succeeds. The loser refetches and chooses again.
+
+**Issue-based alternative considered:** an append-only Issue-comment claim ledger can deterministically choose the earliest valid claim, but it introduces a second claim state, lease/renew/release events, and more GitHub API reads. It is not the default unless measured aggregate-file contention becomes problematic.
+
+---
+
+## 2026-09-27 — Methods own manuals; schedulers only bootstrap
+
+**Decision:** Manager/Worker procedures and runtime requirements live in immutable versioned Methods inside the repository.
 
 **Why:** Scheduler prompts should not become a second configuration store.
 
----
-
-## 2026-09-27 — Local Panel reads the same repository state
-
-**Decision:** The dashboard is a local web app backed directly by repository files.
-
-**Why:** Human visibility should not require a remote DB or duplicate state service.
-
-
----
-
-## 2026-09-27 — Aggregate state supersedes entity-per-file for the default template
-
-**Decision:** The default template now stores Work Items, Incidents, Manager state, and Manager Runs in four known aggregate JSON files.
-
-**Supersedes:** the earlier same-day decision to make every Work Item / Run / Lease / Incident a separate file.
-
-**Why:** The default template should optimize first for simplicity, GitHub-MCP ergonomics, and a completely static GitHub Pages Panel. A handful of known JSON files eliminates directory discovery/index generation and removes the local Panel server.
-
-**Concurrency trade-off:** unrelated Agent writes can conflict on the same aggregate file. GitHub blob SHA remains the safety primitive: stale updates fail, then the Agent refetches, re-evaluates, reapplies only its intended entity change, and retries.
-
-**Future threshold:** shard state only after measured contention becomes operationally meaningful.
+The template starts with `general-manager@v1` and `general-worker@v1`.
 
 ---
 
 ## 2026-09-27 — Panel is GitHub Pages read-only
 
-**Decision:** The local read/write Panel is removed. The root static Panel fetches canonical repository JSON/Markdown directly and never writes state.
+**Decision:** The root static Panel fetches canonical repository JSON/Markdown directly and never writes state.
 
-**Why:** Agents already mutate GitHub remote through GitHub MCP. A write-capable local Panel created an unnecessary second mutation path and local/remote synchronization state.
+**Why:** Agents already mutate GitHub remote through GitHub MCP. A write-capable local Panel would create an unnecessary second mutation path and local/remote synchronization problem.
 
-**Deployment:** GitHub Pages can publish the `main` branch repository root directly. No application server, render step, snapshot generation, or deployment Actions workflow is required.
+**Deployment:** GitHub Pages can publish the `main` branch repository root directly. No application server, render step, snapshot generation, or custom Pages deployment workflow is required.
