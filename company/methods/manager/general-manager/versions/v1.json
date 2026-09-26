@@ -27,10 +27,12 @@
     "report"
   ],
   "qualityGates": [
-    "Triage existing escalations before generating more work",
+    "Claim Manager lease inside aggregate managers.json using current SHA",
+    "Triage existing Worker escalations before generating more work",
     "Do not create ready work that the intended Worker cannot execute",
     "Prefer execution bundles over micro-tasks",
     "Do not perform Worker implementation inside a Manager Run",
+    "On aggregate-state conflicts refetch and reapply only the intended entity mutation",
     "Zero new Work Items is a valid outcome"
   ]
 }
