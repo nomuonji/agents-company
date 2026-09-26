@@ -6,12 +6,21 @@
   "mission": "Turn a human-defined mission into durable, reviewable work through Manager and Worker agents.",
   "defaultManagerJobId": "general-manager",
   "controlPlane": "git",
-  "canonicalStateRoot": "company/state",
   "schedulerPolicy": "external-bootstrap-only",
   "issuePolicy": "human-notification-and-discussion-only",
   "pullRequestPolicy": "reviewable-deliverables-only",
   "panel": {
-    "command": "npm run panel",
-    "url": "http://localhost:4310"
+    "mode": "github-pages-read-only",
+    "dataSource": "repository-files",
+    "sourceBranch": "main"
+  },
+  "managerJobIds": [
+    "general-manager"
+  ],
+  "canonicalStateFiles": {
+    "workItems": "company/state/work-items.json",
+    "incidents": "company/state/incidents.json",
+    "managers": "company/state/managers.json",
+    "managerRuns": "company/state/manager-runs.json"
   }
 }
