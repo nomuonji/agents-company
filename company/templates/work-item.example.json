@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "id": "wi-example",
+  "title": "Example work item",
+  "objective": "Produce a concrete deliverable.",
+  "status": "ready",
+  "priority": "medium",
+  "managerJobId": "general-manager",
+  "workerMethod": {
+    "id": "general-worker",
+    "version": "active"
+  },
+  "workerMethodVersion": null,
+  "dedupeKey": "example|deliverable",
+  "acceptanceCriteria": [
+    "The requested deliverable exists",
+    "Validation passes"
+  ],
+  "execution": {
+    "requiredTools": [
+      "github"
+    ],
+    "requiredCapabilities": [
+      "repo_read",
+      "repo_write"
+    ],
+    "validationStrategy": {
+      "type": "explicit",
+      "checks": [
+        "verify the deliverable in repository state"
+      ]
+    },
+    "deliveryMode": "direct_commit"
+  },
+  "claim": null,
+  "escalation": null,
+  "executionReceipt": null,
+  "resultSummary": null,
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "finishedAt": null
+}
