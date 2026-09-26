@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Agents Company Incident Issue metadata",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "kind",
+    "status",
+    "severity",
+    "detectedBy",
+    "managerJobIds"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "kind": {
+      "const": "incident"
+    },
+    "status": {
+      "enum": [
+        "open",
+        "investigating",
+        "resolved"
+      ]
+    },
+    "severity": {
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ]
+    },
+    "detectedBy": {
+      "enum": [
+        "worker",
+        "manager",
+        "human"
+      ]
+    },
+    "managerJobIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "relatedIssueNumbers": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    },
+    "dedupeKey": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "rootCause": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "fix": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "regressionCheck": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "prevention": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "operatingModelChanged": {
+      "type": "boolean"
+    },
+    "resolvedAt": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  }
+}
