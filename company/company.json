@@ -2,24 +2,30 @@
   "schemaVersion": 1,
   "companyId": "agents-company",
   "name": "Agents Company",
-  "description": "Repository-native multi-agent company template",
+  "description": "GitHub-native multi-agent company template",
   "mission": "Turn a human-defined mission into durable, reviewable work through Manager and Worker agents.",
   "defaultManagerJobId": "general-manager",
-  "controlPlane": "git",
-  "schedulerPolicy": "external-bootstrap-only",
-  "issuePolicy": "human-notification-and-discussion-only",
-  "pullRequestPolicy": "reviewable-deliverables-only",
-  "panel": {
-    "mode": "github-pages-read-only",
-    "dataSource": "repository-files",
-    "sourceBranch": "main"
-  },
   "managerJobIds": [
     "general-manager"
   ],
+  "controlPlane": "github",
+  "schedulerPolicy": "external-bootstrap-only",
+  "workItemStore": "github-issues",
+  "incidentStore": "github-issues",
+  "claimStore": "repository-lock-files",
+  "pullRequestPolicy": "reviewable-deliverables-only",
+  "github": {
+    "repositoryFullName": "nomuonji/agents-company",
+    "workTitlePrefix": "[Work]",
+    "incidentTitlePrefix": "[Incident]"
+  },
+  "panel": {
+    "mode": "github-pages-read-only",
+    "issueSource": "github-api-public",
+    "privateSnapshotPath": "panel-data/issues.json",
+    "sourceBranch": "main"
+  },
   "canonicalStateFiles": {
-    "workItems": "company/state/work-items.json",
-    "incidents": "company/state/incidents.json",
     "managers": "company/state/managers.json",
     "managerRuns": "company/state/manager-runs.json"
   }
