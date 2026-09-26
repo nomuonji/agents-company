@@ -16,6 +16,6 @@ jobs:
           node-version: 22
       - run: npm test
       - run: npm run validate
-      - run: node --check apps/panel/server.mjs
-      - run: node --check apps/panel/public/app.js
-      - run: node --check packages/cli/src/cli.mjs
+      - run: node --check panel.js
+      - run: node --check packages/core/src/index.mjs
+      - run: node --check packages/core/src/validate.mjs
